@@ -4,7 +4,7 @@
 slndir="$(dirname "${BASH_SOURCE[0]}")/src"
 
 # Restore + Build
-dotnet build "$slndir/minsk.sln" --nologo || exit
+dotnet build "$slndir/EV2lang.sln" --nologo || exit
 
 # Test
-dotnet test "$slndir/Minsk.Tests" --nologo --no-build
+dotnet test "$slndir/EV2.Tests" --nologo --no-build

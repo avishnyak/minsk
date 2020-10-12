@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsTool>true</IsTool>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <ProjectName>EV2</ProjectName>
+    <RootNamespace>EV2</RootNamespace>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EV2\EV2.csproj" />
+    <ProjectReference Include="..\EV2.Host\EV2.Host.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mono.Options" Version="6.6.0.161" />
+  </ItemGroup>
+
+</Project>

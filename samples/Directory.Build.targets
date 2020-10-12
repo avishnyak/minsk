@@ -11,17 +11,17 @@
     </ItemGroup>
 
     <PropertyGroup>
-      <MinskCompilerArgs>@(Compile->'"%(Identity)"', ' ')</MinskCompilerArgs>
-      <MinskCompilerArgs>$(MinskCompilerArgs) /o "@(IntermediateAssembly)"</MinskCompilerArgs>
-      <MinskCompilerArgs>$(MinskCompilerArgs) @(ReferencePath->'/r "%(Identity)"', ' ')</MinskCompilerArgs>
+      <EV2CompilerArgs>@(Compile->'"%(Identity)"', ' ')</EV2CompilerArgs>
+      <EV2CompilerArgs>$(EV2CompilerArgs) /o "@(IntermediateAssembly)"</EV2CompilerArgs>
+      <EV2CompilerArgs>$(EV2CompilerArgs) @(ReferencePath->'/r "%(Identity)"', ' ')</EV2CompilerArgs>
 
-      <MinskScriptExt Condition="$([MSBuild]::IsOSUnixLike())">.sh</MinskScriptExt>
-      <MinskScriptExt Condition="$([MSBuild]::IsOSPlatform('Windows'))">.cmd</MinskScriptExt>
-      <MinskCompilerScript Condition="'$(MinskCompilerScript)' == ''">msc$(MinskScriptExt)</MinskCompilerScript>
-      <MinskCompileCommand>"$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..\', '$(MinskCompilerScript)'))" $(MinskCompilerArgs)</MinskCompileCommand>
+      <EV2ScriptExt Condition="$([MSBuild]::IsOSUnixLike())">.sh</EV2ScriptExt>
+      <EV2ScriptExt Condition="$([MSBuild]::IsOSPlatform('Windows'))">.cmd</EV2ScriptExt>
+      <EV2CompilerScript Condition="'$(EV2CompilerScript)' == ''">ev2c$(EV2ScriptExt)</EV2CompilerScript>
+      <EV2CompileCommand>"$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..\', '$(EV2CompilerScript)'))" $(EV2CompilerArgs)</EV2CompileCommand>
     </PropertyGroup>
 
-    <Exec Command="$(MinskCompileCommand)" />
+    <Exec Command="$(EV2CompileCommand)" />
   </Target>
 
 </Project>
