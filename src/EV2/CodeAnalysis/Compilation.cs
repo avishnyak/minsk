@@ -80,7 +80,7 @@ namespace EV2.CodeAnalysis
 
         private BoundProgram GetProgram()
         {
-            var previous = Previous == null ? null : Previous.GetProgram();
+            var previous = Previous?.GetProgram();
             return Binder.BindProgram(IsScript, previous, GlobalScope);
         }
 

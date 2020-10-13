@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using EV2.CodeAnalysis;
 using EV2.CodeAnalysis.Syntax;
 using EV2.Host;
 
@@ -29,10 +29,8 @@ namespace EV2.CompilerService {
             return Task.CompletedTask;
         }
 
-        public async Task<IEnumerable<SyntaxTree>> Parse(
-            IList<string> sourcePaths,
-            CancellationToken cancellationToken = default
-        )
+        public async Task<IEnumerable<SyntaxTree>> Parse(IList<string> sourcePaths,
+                                                         CancellationToken cancellationToken = default)
         {
             var syntaxTrees = new ConcurrentBag<SyntaxTree>();
 
@@ -82,6 +80,27 @@ namespace EV2.CompilerService {
             }
 
             return syntaxTrees;
+        }
+
+        public bool EmitBinary(IEnumerable<SyntaxTree> syntaxTrees,
+                         string moduleName,
+                         string[] referencePaths,
+                         string outputPath)
+        {
+            var compilation = Compilation.Create(syntaxTrees.ToArray());
+
+            if (compilation == null) {
+                return false;
+            }
+
+            var diagnostics = compilation.Emit(moduleName, referencePaths, outputPath);
+
+            if (diagnostics.Count() > 0)
+            {
+                _host.PublishDiagnostics(diagnostics);
+            }
+
+            return true;
         }
 
         /// <summary>

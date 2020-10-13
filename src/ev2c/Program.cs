@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
-using EV2.CodeAnalysis;
 using EV2.CodeAnalysis.Syntax;
 using EV2.CompilerService;
 using EV2.IO;
@@ -90,19 +88,15 @@ namespace EV2
                 return 1;
             }
 
-            var compilation = Compilation.Create(syntaxTrees.ToArray());
-            var diagnostics = compilation.Emit(moduleName, referencePaths.ToArray(), outputPath);
-
-            await compilerService.Shutdown();
-            compilerService.Exit();
-
-            if (diagnostics.Any())
+            if (!compilerService.EmitBinary(syntaxTrees, moduleName, referencePaths.ToArray(), outputPath))
             {
-                Console.Error.WriteDiagnostics(diagnostics);
                 Console.Out.WriteBuildSummary(false, compilerHost.Errors, compilerHost.Warnings);
 
                 return 1;
             }
+
+            await compilerService.Shutdown();
+            compilerService.Exit();
 
             Console.Out.WriteBuildSummary(true, compilerHost.Errors, compilerHost.Warnings);
 
