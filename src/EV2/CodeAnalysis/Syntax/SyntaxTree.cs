@@ -43,9 +43,9 @@ namespace EV2.CodeAnalysis.Syntax
             diagnostics = parser.Diagnostics.ToImmutableArray();
         }
 
-        public static SyntaxTree Parse(string text)
+        public static SyntaxTree Parse(string text, string filename = "")
         {
-            var sourceText = SourceText.From(text);
+            var sourceText = SourceText.From(text, filename);
             return Parse(sourceText);
         }
 

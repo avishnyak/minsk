@@ -121,7 +121,7 @@ namespace EV2.IO
             }
 
             foreach (var diagnostic in diagnostics.Where(d => d.DiagnosticLocation.Uri != null)
-                                                  .OrderBy(d => d.DiagnosticLocation.Uri)
+                                                  .OrderBy(d => d.DiagnosticLocation.Uri.AbsolutePath)
                                                   .ThenBy(d => d.DiagnosticLocation.Range.Start)
                                                   .ThenBy(d => d.DiagnosticLocation.Range.End))
             {
@@ -148,19 +148,18 @@ namespace EV2.IO
 
                     // Simple case, there is just 1 line
                     if (lines.Length == 1) {
-                        prefix = lines[0].Substring(0, diagnostic.DiagnosticLocation.Range.Start.Character - 1);
-                        suffix = lines[0].Substring(diagnostic.DiagnosticLocation.Range.End.Character - 1, lines[0].Length - 1);
-                        error = lines[0].Substring(diagnostic.DiagnosticLocation.Range.Start.Character - 1, diagnostic.DiagnosticLocation.Range.End.Character - 1);
+                        prefix = lines[0][0..diagnostic.DiagnosticLocation.Range.Start.Character];
+                        suffix = lines[0][diagnostic.DiagnosticLocation.Range.End.Character..^0];
+                        error = lines[0][diagnostic.DiagnosticLocation.Range.Start.Character..diagnostic.DiagnosticLocation.Range.End.Character];
                     }
                     else {
-                        prefix = lines[0].Substring(0, diagnostic.DiagnosticLocation.Range.Start.Character - 1);
-                        suffix = lines[^1].Substring(diagnostic.DiagnosticLocation.Range.End.Character - 1, lines[^1].Length - 1);
+                        prefix = lines[0][0..diagnostic.DiagnosticLocation.Range.Start.Character];
+                        suffix = lines[^1][diagnostic.DiagnosticLocation.Range.End.Character..^0];
                         error = diagnostic.TargetSourceSnippet ?? string.Empty;
                     }
 
                     writer.Write("    ");
                     writer.Write(prefix);
-
                     writer.SetForeground(messageColor);
                     writer.Write(error);
                     writer.ResetColor();
