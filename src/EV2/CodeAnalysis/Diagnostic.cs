@@ -33,7 +33,9 @@ namespace EV2.CodeAnalysis
 
                     var path = Uri.IsWellFormedUriString(Location.FileName, UriKind.Absolute)
                         ? new Uri(Location.FileName)
-                        : new Uri(Path.GetFullPath(Location.FileName));
+                        : string.IsNullOrWhiteSpace(Location.FileName)
+                            ? new Uri("file://repl")
+                            : new Uri(Path.GetFullPath(Location.FileName));
 
                     _diagnosticLocation = new DiagnosticLocation(path, range);
                 }
