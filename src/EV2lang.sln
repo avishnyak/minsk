@@ -14,6 +14,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ev2i", "ev2i\ev2i.csproj", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EV2.Host", "EV2.Host\EV2.Host.csproj", "{882663CC-F5C7-4055-8574-47E3B8296560}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EV2.EV2LanguageServer", "EV2.EV2LanguageServer\EV2.EV2LanguageServer.csproj", "{1A7E5AFF-23A4-49BA-9626-E29181171C36}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +46,10 @@ Global
 		{882663CC-F5C7-4055-8574-47E3B8296560}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{882663CC-F5C7-4055-8574-47E3B8296560}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{882663CC-F5C7-4055-8574-47E3B8296560}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A7E5AFF-23A4-49BA-9626-E29181171C36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A7E5AFF-23A4-49BA-9626-E29181171C36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A7E5AFF-23A4-49BA-9626-E29181171C36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A7E5AFF-23A4-49BA-9626-E29181171C36}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

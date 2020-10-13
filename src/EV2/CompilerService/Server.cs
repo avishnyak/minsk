@@ -29,6 +29,26 @@ namespace EV2.CompilerService {
             return Task.CompletedTask;
         }
 
+        public IEnumerable<Diagnostic> Validate(string source, string sourcePath)
+        {
+            var tree = SyntaxTree.Parse(source, sourcePath);
+
+            if (tree.Diagnostics.Count() > 0)
+            {
+                _host.PublishDiagnostics(tree.Diagnostics);
+            }
+
+            var program = Compilation.Create(tree);
+            var diagnostics = program.Validate();
+
+            if (diagnostics.Count() > 0)
+            {
+                _host.PublishDiagnostics(diagnostics);
+            }
+
+            return tree.Diagnostics.Concat(diagnostics);
+        }
+
         public async Task<IEnumerable<SyntaxTree>> Parse(IList<string> sourcePaths,
                                                          CancellationToken cancellationToken = default)
         {

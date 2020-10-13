@@ -84,6 +84,12 @@ namespace EV2.CodeAnalysis
             return Binder.BindProgram(IsScript, previous, GlobalScope);
         }
 
+        public ImmutableArray<Diagnostic> Validate()
+        {
+            var program = GetProgram();
+            return program.Diagnostics;
+        }
+
         public EvaluationResult Evaluate(Dictionary<VariableSymbol, object> variables)
         {
             if (GlobalScope.Diagnostics.Any())

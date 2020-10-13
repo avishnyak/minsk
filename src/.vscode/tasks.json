@@ -1,6 +1,17 @@
 {
     "version": "2.0.0",
     "tasks": [
+        // Builds vscode extension
+        {
+            "label": "npm",
+            "command": "npm",
+            "options": {
+                "cwd": "${workspaceFolder}/EV2.EV2LanguageServer.vscode-extension"
+            },
+            "args": ["run", "compile", "--loglevel", "silent"],
+            "type": "shell",
+            "problemMatcher": "$tsc-watch"
+        },
         // Builds 'ev2lang.sln' solution with default configurations
         {
             "label": "build",
@@ -29,7 +40,7 @@
             "type": "process",
             "group": "build",
             "options": {
-                "cwd": "${workspaceFolder}/src"
+                "cwd": "${workspaceFolder}"
             },
             "args": [
                 "build",
@@ -51,7 +62,7 @@
                 "isDefault": true
             },
             "options": {
-                "cwd": "${workspaceFolder}/src"
+                "cwd": "${workspaceFolder}"
             },
             "args": [
                 "test"
@@ -69,7 +80,7 @@
             "type": "process",
             "group": "build",
             "options": {
-                "cwd": "${workspaceFolder}/src"
+                "cwd": "${workspaceFolder}"
             },
             "args": [
                 "clean"
@@ -205,7 +216,8 @@
                 "EV2",
                 "EV2.Generators",
                 "EV2.Tests",
-                "EV2.Host"
+                "EV2.Host",
+                "EV2.EV2LanguageServer"
             ],
             "default": "ev2c"
         },

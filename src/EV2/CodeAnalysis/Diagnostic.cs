@@ -27,11 +27,15 @@ namespace EV2.CodeAnalysis
             get {
                 // Lazy initialize external location
                 if (_diagnosticLocation == null) {
-                    var start = new Position(Location.StartLine + 1, Location.StartCharacter + 1);
-                    var end = new Position(Location.EndLine + 1, Location.EndCharacter + 1);
+                    var start = new Position(Location.StartLine, Location.StartCharacter);
+                    var end = new Position(Location.EndLine, Location.EndCharacter);
                     var range = new Range(start, end);
 
-                    _diagnosticLocation = new DiagnosticLocation(new Uri(Path.GetFullPath(Location.FileName)), range);
+                    var path = Uri.IsWellFormedUriString(Location.FileName, UriKind.Absolute)
+                        ? new Uri(Location.FileName)
+                        : new Uri(Path.GetFullPath(Location.FileName));
+
+                    _diagnosticLocation = new DiagnosticLocation(path, range);
                 }
 
                 return _diagnosticLocation;

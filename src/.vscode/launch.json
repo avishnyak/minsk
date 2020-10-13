@@ -5,6 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--disable-extensions",
+                "--enable-proposed-api",
+                "--extensionDevelopmentPath=${workspaceRoot}/EV2.EV2LanguageServer.vscode-extension"
+            ],
+            "stopOnEntry": false,
+            "sourceMaps": true,
+            "outFiles": ["${workspaceRoot}/EV2.EV2LanguageServer.vscode-extension/out/src/**/*.js"],
+            "preLaunchTask": "npm"
+        },
+        {
             "name": ".NET Core Launch (ev2i)",
             "type": "coreclr",
             "request": "launch",
