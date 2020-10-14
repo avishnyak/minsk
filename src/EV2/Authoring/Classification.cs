@@ -1,4 +1,4 @@
-namespace EV2.CodeAnalysis.Authoring
+namespace EV2.Authoring
 {
     public enum Classification
     {

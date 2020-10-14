@@ -1,6 +1,6 @@
 using EV2.CodeAnalysis.Text;
 
-namespace EV2.CodeAnalysis.Authoring
+namespace EV2.Authoring
 {
     public sealed class ClassifiedSpan
     {

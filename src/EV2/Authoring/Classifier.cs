@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 using EV2.CodeAnalysis.Syntax;
 using EV2.CodeAnalysis.Text;
 
-namespace EV2.CodeAnalysis.Authoring
+namespace EV2.Authoring
 {
     public static class Classifier
     {

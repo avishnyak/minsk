@@ -9,19 +9,14 @@ namespace EV2.CodeAnalysis.Binding
         {
             if (operand.ConstantValue != null)
             {
-                switch (op.Kind)
+                return op.Kind switch
                 {
-                    case BoundUnaryOperatorKind.Identity:
-                        return new BoundConstant((int)operand.ConstantValue.Value);
-                    case BoundUnaryOperatorKind.Negation:
-                        return new BoundConstant(-(int)operand.ConstantValue.Value);
-                    case BoundUnaryOperatorKind.LogicalNegation:
-                        return new BoundConstant(!(bool)operand.ConstantValue.Value);
-                    case BoundUnaryOperatorKind.OnesComplement:
-                        return new BoundConstant(~(int)operand.ConstantValue.Value);
-                    default:
-                        throw new Exception($"Unexpected unary operator {op.Kind}");
-                }
+                    BoundUnaryOperatorKind.Identity => new BoundConstant((int)operand.ConstantValue.Value),
+                    BoundUnaryOperatorKind.Negation => new BoundConstant(-(int)operand.ConstantValue.Value),
+                    BoundUnaryOperatorKind.LogicalNegation => new BoundConstant(!(bool)operand.ConstantValue.Value),
+                    BoundUnaryOperatorKind.OnesComplement => new BoundConstant(~(int)operand.ConstantValue.Value),
+                    _ => throw new Exception($"Unexpected unary operator {op.Kind}")
+                };
             }
 
             return null;

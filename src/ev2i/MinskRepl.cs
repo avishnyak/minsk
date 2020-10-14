@@ -2,9 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-
+using EV2.Authoring;
 using EV2.CodeAnalysis;
-using EV2.CodeAnalysis.Authoring;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 using EV2.IO;
@@ -14,7 +13,7 @@ namespace EV2
     internal sealed class EV2Repl : Repl
     {
         private bool _loadingSubmission;
-        private static readonly Compilation emptyCompilation = Compilation.CreateScript(null);
+        private static readonly Compilation _emptyCompilation = Compilation.CreateScript(null);
         private Compilation? _previous;
         private bool _showTree;
         private bool _showProgram;
@@ -130,7 +129,7 @@ namespace EV2
         [MetaCommand("ls", "Lists all symbols")]
         private void EvaluateLs()
         {
-            var compilation = _previous ?? emptyCompilation;
+            var compilation = _previous ?? _emptyCompilation;
             var symbols = compilation.GetSymbols().OrderBy(s => s.Kind).ThenBy(s => s.Name);
             foreach (var symbol in symbols)
             {
@@ -142,7 +141,7 @@ namespace EV2
         [MetaCommand("dump", "Shows bound tree of a given function")]
         private void EvaluateDump(string functionName)
         {
-            var compilation = _previous ?? emptyCompilation;
+            var compilation = _previous ?? _emptyCompilation;
             var symbol = compilation.GetSymbols().OfType<FunctionSymbol>().SingleOrDefault(f => f.Name == functionName);
             if (symbol == null)
             {

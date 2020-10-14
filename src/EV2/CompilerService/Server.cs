@@ -8,7 +8,8 @@ using EV2.CodeAnalysis;
 using EV2.CodeAnalysis.Syntax;
 using EV2.Host;
 
-namespace EV2.CompilerService {
+namespace EV2.CompilerService
+{
     public class Server
     {
         private readonly IHost _host;
@@ -25,28 +26,39 @@ namespace EV2.CompilerService {
         /// </summary>
         /// <param name="cancellationToken">Cancel initialization</param>
         /// <returns>Task</returns>
-        public Task Initialize(CancellationToken cancellationToken = default) {
+        public Task Initialize(CancellationToken cancellationToken = default)
+        {
             return Task.CompletedTask;
         }
 
-        public IEnumerable<Diagnostic> Validate(string source, string sourcePath)
+        public Task<IEnumerable<Diagnostic>> Validate(string source, string sourcePath, CancellationToken cancellationToken)
         {
-            var tree = SyntaxTree.Parse(source, sourcePath);
-
-            if (tree.Diagnostics.Count() > 0)
+            return Task.Run(() =>
             {
-                _host.PublishDiagnostics(tree.Diagnostics);
-            }
+                var tree = SyntaxTree.Parse(source, sourcePath);
 
-            var program = Compilation.Create(tree);
-            var diagnostics = program.Validate();
+                cancellationToken.ThrowIfCancellationRequested();
 
-            if (diagnostics.Count() > 0)
-            {
-                _host.PublishDiagnostics(diagnostics);
-            }
+                if (tree.Diagnostics.Count() > 0)
+                {
+                    _host.PublishDiagnostics(tree.Diagnostics, cancellationToken);
+                }
 
-            return tree.Diagnostics.Concat(diagnostics);
+                var program = Compilation.Create(tree);
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var diagnostics = program.Validate();
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (diagnostics.Count() > 0)
+                {
+                    _host.PublishDiagnostics(diagnostics);
+                }
+
+                return new List<Diagnostic>(tree.Diagnostics).Concat(diagnostics);
+            }, cancellationToken);
         }
 
         public async Task<IEnumerable<SyntaxTree>> Parse(IList<string> sourcePaths,
@@ -62,7 +74,8 @@ namespace EV2.CompilerService {
             };
 
             // If we are compiling a small amount of files, favor sequential processing.
-            if (sourcePaths.Count < Environment.ProcessorCount) {
+            if (sourcePaths.Count < Environment.ProcessorCount)
+            {
                 foreach (var path in sourcePaths)
                 {
                     var syntaxTree = SyntaxTree.Load(path);
@@ -80,7 +93,6 @@ namespace EV2.CompilerService {
                         syntaxTrees.Add(syntaxTree);
                         po.CancellationToken.ThrowIfCancellationRequested();
                     });
-
                 }
                 catch (OperationCanceledException e)
                 {
@@ -109,7 +121,8 @@ namespace EV2.CompilerService {
         {
             var compilation = Compilation.Create(syntaxTrees.ToArray());
 
-            if (compilation == null) {
+            if (compilation == null)
+            {
                 return false;
             }
 
@@ -130,7 +143,8 @@ namespace EV2.CompilerService {
         /// </summary>
         /// <param name="cancellationToken">Cancel shutdown</param>
         /// <returns>Task</returns>
-        public Task Shutdown(CancellationToken cancellationToken = default) {
+        public Task Shutdown(CancellationToken cancellationToken = default)
+        {
             _shutDownRequested = true;
 
             return Task.CompletedTask;
@@ -140,8 +154,10 @@ namespace EV2.CompilerService {
         /// A notification to ask the server to exit its process.
         /// </summary>
         /// <returns>0 on success, 1 if the exit request has already been received before.</returns>
-        public int Exit() {
-            if (!_shutDownRequested || _isExiting) {
+        public int Exit()
+        {
+            if (!_shutDownRequested || _isExiting)
+            {
                 return 1;
             }
 

@@ -1,146 +1,142 @@
-using LanguageServer;
-using LanguageServer.Client;
-using LanguageServer.Parameters.General;
-using LanguageServer.Parameters.TextDocument;
-using LanguageServer.Parameters.Workspace;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using EV2.Host;
 using System.Linq;
 using EV2.CompilerService;
+using System.Threading;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Microsoft.Extensions.Logging;
+using Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri;
+using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 
 namespace EV2.EV2LanguageServer
 {
-    public class App : ServiceConnection, IHost
+    internal sealed class LspHost : IHost
     {
-        private Uri? _workerSpaceRoot;
-        private int _maxNumberOfProblems = 1000;
-        private readonly TextDocumentManager _documents;
+        private readonly Uri? _workerSpaceRoot;
+        private readonly int _maxNumberOfProblems = 1000;
+        private readonly IDictionary<Uri, TextDocumentItem> _documents;
         private readonly Server _server;
+        private readonly ILogger<LspHost> _logger;
+        private readonly ILanguageServerFacade _languageServer;
 
-        public App(Stream input, Stream output)
-            : base(input, output)
+        public LspHost(ILogger<LspHost> logger, ILanguageServerFacade languageServer)
         {
-            _documents = new TextDocumentManager();
-            _documents.Changed += Documents_Changed;
+            _documents = new Dictionary<Uri, TextDocumentItem>();
             _server = new Server(this);
+            _logger = logger;
+            _languageServer = languageServer;
         }
 
-        private void Documents_Changed(object? sender, TextDocumentChangedEventArgs e)
+        internal void DidOpenTextDocument(TextDocumentItem document)
         {
-            ValidateTextDocument(e.Document);
+            _logger.LogInformation($"Document opened {document.Uri.GetFileSystemPath()} ({document.Version})");
+            _documents.Add(document.Uri, document);
         }
 
-        protected override Result<InitializeResult, ResponseError<InitializeErrorData>> Initialize(InitializeParams @params)
+        internal void DidChangeTextDocument(VersionedTextDocumentIdentifier document, Container<TextDocumentContentChangeEvent> changes)
         {
-            _workerSpaceRoot = @params.rootUri;
-            var result = new InitializeResult
+            _logger.LogInformation($"Document changed {document.Uri.GetFileSystemPath()} ({document.Version})");
+
+            Uri docUri = document.Uri;
+            if (!_documents.ContainsKey(docUri))
             {
-                capabilities = new ServerCapabilities
-                {
-                    textDocumentSync = TextDocumentSyncKind.Full,
-                    // documentSymbolProvider = true
-                }
-            };
-            return Result<InitializeResult, ResponseError<InitializeErrorData>>.Success(result);
+                return;
+            }
+
+            var doc = _documents[docUri];
+
+            // We only handle a full document update right now
+            doc.Version = document.Version;
+            doc.Text = changes.First().Text;
         }
 
-        // protected override Result<DocumentSymbolResult, ResponseError> DocumentSymbols(DocumentSymbolParams @params)
+        internal void DidCloseTextDocument(TextDocumentItem document)
+        {
+            _logger.LogInformation($"Document closed {document.Uri.GetFileSystemPath()} ({document.Version})");
+
+            Uri docUri = document.Uri;
+            if (_documents.ContainsKey(docUri))
+            {
+                _documents.Remove(docUri);
+            }
+        }
+
+        internal async Task<IEnumerable<IDiagnostic>> ValidateTextDocumentAsync(Uri docUri,
+                                                                                CancellationToken cancellationToken)
+        {
+            if (!_documents.ContainsKey(docUri))
+            {
+                _logger.LogError("File is not open for validation.");
+                return Array.Empty<IDiagnostic>();
+            }
+
+            var doc = _documents[docUri];
+
+            return await _server.Validate(doc.Text, doc.Uri.GetFileSystemPath(), cancellationToken);
+        }
+
+        // void ValidateTextDocument(TextDocumentItem document)
         // {
-        //     throw new NotImplementedException();
+        //     _logger.LogInformation($"Validating {document.Uri.GetFileSystemPath()} ({document.Version})");
+
+        //     var validationTask = Task.Run(() => _server.Validate(document.text, document.uri.ToString(), CancellationToken), CancellationToken);
+
+        //     try
+        //     {
+        //         var diagnostics = validationTask.Result;
+
+        //         if (diagnostics.Count() > 0)
+        //         {
+        //             Logger.Instance.Info($"Found {diagnostics.Count()} issues.");
+        //         }
+        //     }
+        //     catch (AggregateException ae)
+        //     {
+        //         Logger.Instance.Error(ae.ToString());
+        //     }
+
+        //     // TODO: Save syntax tree in LRU cache
         // }
-
-        protected override void DidOpenTextDocument(DidOpenTextDocumentParams @params)
-        {
-            _documents.Add(@params.textDocument);
-            Logger.Instance.Log($"{@params.textDocument.uri} opened.");
-        }
-
-        protected override void DidChangeTextDocument(DidChangeTextDocumentParams @params)
-        {
-            _documents.Change(@params.textDocument.uri, @params.textDocument.version, @params.contentChanges);
-            Logger.Instance.Log($"{@params.textDocument.uri} changed.");
-        }
-
-        protected override void DidCloseTextDocument(DidCloseTextDocumentParams @params)
-        {
-            _documents.Remove(@params.textDocument.uri);
-            Logger.Instance.Log($"{@params.textDocument.uri} closed.");
-        }
-
-        protected override void DidChangeConfiguration(DidChangeConfigurationParams @params)
-        {
-            _maxNumberOfProblems = @params?.settings?.languageServerExample?.maxNumberOfProblems ?? _maxNumberOfProblems;
-            Logger.Instance.Log($"maxNumberOfProblems is set to {_maxNumberOfProblems}.");
-
-            foreach (var document in _documents.All)
-            {
-                ValidateTextDocument(document);
-            }
-        }
-
-        private void ValidateTextDocument(TextDocumentItem document)
-        {
-            Logger.Instance.Log($"Validating file: {document.uri} v{document.version}");
-
-            // Clear existing diagnostics for the file
-            Proxy.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
-            {
-                uri = document.uri,
-                diagnostics = new Diagnostic[] { }
-            });
-
-            var diagnostics = _server.Validate(document.text, document.uri.ToString());
-
-            if (diagnostics.Count() > 0)
-            {
-                Logger.Instance.Log($"Found {diagnostics.Count()} issues.");
-            }
-
-            // TODO: Save syntax tree in LRU cache
-        }
-
-        protected override void DidChangeWatchedFiles(DidChangeWatchedFilesParams @params)
-        {
-            Logger.Instance.Log("We received an file change event");
-        }
-
-        protected override VoidResult<ResponseError> Shutdown()
-        {
-            Logger.Instance.Log("Language Server is about to shutdown.");
-            // WORKAROUND: Language Server does not receive an exit notification.
-            Task.Delay(1000).ContinueWith(_ => Environment.Exit(0));
-            return VoidResult<ResponseError>.Success();
-        }
 
         public void RequestShutdown()
         {
-            Logger.Instance.Log("Compiler requested shutdown");
+            _logger.LogInformation("Compiler requested shutdown.");
         }
 
-        public void PublishDiagnostics(IEnumerable<IDiagnostic> diagnostics)
+        public void ClearDiagnotics(Uri documentUri)
+        {
+            _languageServer.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
+            {
+                Uri = documentUri,
+                Diagnostics = Array.Empty<Diagnostic>()
+            });
+        }
+
+        public void PublishDiagnostics(IEnumerable<IDiagnostic> diagnostics, CancellationToken cancellationToken)
         {
             var groupedDiagnostics = diagnostics.GroupBy(k => k.DiagnosticLocation.Uri);
 
             foreach (var kv in groupedDiagnostics)
             {
-                Proxy.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
+                _languageServer.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
                 {
-                    uri = kv.Key,
-                    diagnostics = kv.Select(d => new Diagnostic()
+                    Uri = kv.Key,
+                    Diagnostics = kv.Select(d => new Diagnostic()
                     {
-                        range = new LanguageServer.Parameters.Range()
-                        {
-                            start = new LanguageServer.Parameters.Position() { line = d.DiagnosticLocation.Range.Start.Line, character = d.DiagnosticLocation.Range.Start.Character },
-                            end = new LanguageServer.Parameters.Position() { line = d.DiagnosticLocation.Range.End.Line, character = d.DiagnosticLocation.Range.End.Character }
-                        },
-                        severity = d.IsError ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning,
-                        source = "EV2",
-                        message = d.Message
+                        Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                            new OmniSharp.Extensions.LanguageServer.Protocol.Models.Position(d.DiagnosticLocation.Range.Start.Line, d.DiagnosticLocation.Range.Start.Character),
+                            new OmniSharp.Extensions.LanguageServer.Protocol.Models.Position(d.DiagnosticLocation.Range.End.Line, d.DiagnosticLocation.Range.End.Character)
+                        ),
+                        Severity = d.IsError ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning,
+                        Source = "EV2",
+                        Message = d.Message
                     }).ToArray()
                 });
+
+                cancellationToken.ThrowIfCancellationRequested();
             }
         }
 

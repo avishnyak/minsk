@@ -34,8 +34,8 @@ export function activate(context: ExtensionContext) {
     let serverOptions: ServerOptions = {
         // run: { command: serverExe, args: ['-lsp', '-d'] },
         run: {
-            command: serverExe,
-            args: ["C:\\Users\\avishnyak\\Source\\repos\\minsk\\src\\EV2.EV2LanguageServer\\bin\\Debug\\EV2.EV2LanguageServer.dll"],
+            command: "C:\\Users\\avishnyak\\Source\\repos\\minsk\\src\\EV2.EV2LanguageServer\\bin\\Debug\\EV2.EV2LanguageServer.exe",
+            args: [],
             transport: TransportKind.pipe,
         },
         // debug: { command: serverExe, args: ['-lsp', '-d'] }
@@ -46,16 +46,6 @@ export function activate(context: ExtensionContext) {
             runtime: "",
         },
     };
-    // let time = 100;
-    // let serverOptions = async () => {
-    //     await new Promise((r) => setTimeout(r, time));
-    //     time = 10000;
-    //     const [reader, writer] = createServerPipeTransport("\\\\.\\pipe\\" + "samplepipe");
-    //     return {
-    //         reader,
-    //         writer,
-    //     };
-    // };
 
     // Options to control the language client
     let clientOptions: LanguageClientOptions = {
@@ -68,7 +58,6 @@ export function activate(context: ExtensionContext) {
         progressOnInitialization: true,
         synchronize: {
             // Synchronize the setting section 'languageServerExample' to the server
-            configurationSection: "EV2",
             fileEvents: workspace.createFileSystemWatcher("**/*.ev2"),
         },
     };

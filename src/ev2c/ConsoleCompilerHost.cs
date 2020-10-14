@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using EV2.Host;
 using EV2.IO;
 
@@ -15,7 +16,7 @@ namespace EV2
         {
         }
 
-        public void PublishDiagnostics(IEnumerable<IDiagnostic> diagnostics)
+        public void PublishDiagnostics(IEnumerable<IDiagnostic> diagnostics, CancellationToken cancellationToken)
         {
             Errors += diagnostics.Count(d => d.IsError);
             Warnings += diagnostics.Count(d => d.IsWarning);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace EV2.Host
 {
@@ -14,6 +15,6 @@ namespace EV2.Host
         void RequestShutdown();
 
         /// <Summary>Notify host of new diagnostic messages.</Summary>
-        void PublishDiagnostics(IEnumerable<IDiagnostic> diagnostics);
+        void PublishDiagnostics(IEnumerable<IDiagnostic> diagnostics, CancellationToken cancellationToken = default);
     }
 }
