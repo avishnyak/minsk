@@ -17,6 +17,14 @@
     "main": "./out/extension",
     "enableProposedApi": true,
     "contributes": {
+        "languages": [
+            {
+                "id": "ev2",
+                "extensions": [
+                    ".ev2"
+                ]
+            }
+        ],
         "configuration": {
             "type": "object",
             "title": "Example configuration",

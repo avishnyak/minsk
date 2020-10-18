@@ -31,7 +31,7 @@ namespace EV2.CompilerService
             return Task.CompletedTask;
         }
 
-        public Task<IEnumerable<Diagnostic>> Validate(string source, string sourcePath, CancellationToken cancellationToken)
+        public Task<Compilation> Validate(string source, string sourcePath, CancellationToken cancellationToken)
         {
             return Task.Run(() =>
             {
@@ -57,7 +57,7 @@ namespace EV2.CompilerService
                     _host.PublishDiagnostics(diagnostics);
                 }
 
-                return new List<Diagnostic>(tree.Diagnostics).Concat(diagnostics);
+                return program;
             }, cancellationToken);
         }
 

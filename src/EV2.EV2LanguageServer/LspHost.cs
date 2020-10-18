@@ -10,21 +10,37 @@ using Microsoft.Extensions.Logging;
 using Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using EV2.CodeAnalysis.Syntax;
+using EV2.CodeAnalysis;
 
 namespace EV2.EV2LanguageServer
 {
+    internal class TextDocumentInfo
+    {
+        public TextDocumentInfo(TextDocumentItem document, Compilation? compilation)
+        {
+            Document = document;
+            Compilation = compilation;
+        }
+
+        public TextDocumentItem Document { get; }
+        public Compilation? Compilation { get; set; }
+    }
+
     internal sealed class LspHost : IHost
     {
         private readonly Uri? _workerSpaceRoot;
         private readonly int _maxNumberOfProblems = 1000;
-        private readonly IDictionary<Uri, TextDocumentItem> _documents;
+        private readonly IDictionary<Uri, TextDocumentInfo> _documents;
         private readonly Server _server;
         private readonly ILogger<LspHost> _logger;
         private readonly ILanguageServerFacade _languageServer;
 
+        internal IDictionary<Uri, TextDocumentInfo> Documents => _documents;
+
         public LspHost(ILogger<LspHost> logger, ILanguageServerFacade languageServer)
         {
-            _documents = new Dictionary<Uri, TextDocumentItem>();
+            _documents = new Dictionary<Uri, TextDocumentInfo>();
             _server = new Server(this);
             _logger = logger;
             _languageServer = languageServer;
@@ -33,7 +49,7 @@ namespace EV2.EV2LanguageServer
         internal void DidOpenTextDocument(TextDocumentItem document)
         {
             _logger.LogInformation($"Document opened {document.Uri.GetFileSystemPath()} ({document.Version})");
-            _documents.Add(document.Uri, document);
+            _documents.Add(document.Uri, new TextDocumentInfo(document, null));
         }
 
         internal void DidChangeTextDocument(VersionedTextDocumentIdentifier document, Container<TextDocumentContentChangeEvent> changes)
@@ -41,6 +57,7 @@ namespace EV2.EV2LanguageServer
             _logger.LogInformation($"Document changed {document.Uri.GetFileSystemPath()} ({document.Version})");
 
             Uri docUri = document.Uri;
+
             if (!_documents.ContainsKey(docUri))
             {
                 return;
@@ -49,8 +66,8 @@ namespace EV2.EV2LanguageServer
             var doc = _documents[docUri];
 
             // We only handle a full document update right now
-            doc.Version = document.Version;
-            doc.Text = changes.First().Text;
+            doc.Document.Version = document.Version;
+            doc.Document.Text = changes.First().Text;
         }
 
         internal void DidCloseTextDocument(TextDocumentItem document)
@@ -64,18 +81,31 @@ namespace EV2.EV2LanguageServer
             }
         }
 
-        internal async Task<IEnumerable<IDiagnostic>> ValidateTextDocumentAsync(Uri docUri,
-                                                                                CancellationToken cancellationToken)
+        internal async Task<SyntaxTree> ParseTextDocumentAsync(Uri docUri, CancellationToken cancellationToken)
+        {
+            var source = new List<string>(1)
+            {
+                docUri.GetFileSystemPath()
+            };
+
+            var syntaxTrees = await _server.Parse(source, cancellationToken);
+
+            return syntaxTrees.FirstOrDefault();
+        }
+
+        internal async Task<Compilation?> ValidateTextDocumentAsync(Uri docUri, CancellationToken cancellationToken)
         {
             if (!_documents.ContainsKey(docUri))
             {
                 _logger.LogError("File is not open for validation.");
-                return Array.Empty<IDiagnostic>();
+                return null;
             }
 
             var doc = _documents[docUri];
 
-            return await _server.Validate(doc.Text, doc.Uri.GetFileSystemPath(), cancellationToken);
+            doc.Compilation = await _server.Validate(doc.Document.Text, doc.Document.Uri.GetFileSystemPath(), cancellationToken);
+
+            return doc.Compilation;
         }
 
         // void ValidateTextDocument(TextDocumentItem document)
@@ -111,7 +141,7 @@ namespace EV2.EV2LanguageServer
             _languageServer.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
             {
                 Uri = documentUri,
-                Diagnostics = Array.Empty<Diagnostic>()
+                Diagnostics = Array.Empty<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>()
             });
         }
 
@@ -124,7 +154,7 @@ namespace EV2.EV2LanguageServer
                 _languageServer.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
                 {
                     Uri = kv.Key,
-                    Diagnostics = kv.Select(d => new Diagnostic()
+                    Diagnostics = kv.Select(d => new OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic()
                     {
                         Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                             new OmniSharp.Extensions.LanguageServer.Protocol.Models.Position(d.DiagnosticLocation.Range.Start.Line, d.DiagnosticLocation.Range.Start.Character),

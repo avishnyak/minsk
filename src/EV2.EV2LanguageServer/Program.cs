@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -33,6 +33,7 @@ namespace EV2.EV2LanguageServer
                              .SetMinimumLevel(LogLevel.Debug);
                        })
                        .WithHandler<TextDocumentHandler>()
+                       .WithHandler<SemanticTokensHandler>()
                        .WithServices(x => x.AddLogging(b => b.SetMinimumLevel(LogLevel.Trace)))
                        .WithServices(s =>
                        {

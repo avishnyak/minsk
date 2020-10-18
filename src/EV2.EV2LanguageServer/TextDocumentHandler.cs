@@ -20,7 +20,7 @@ namespace EV2.EV2LanguageServer
         private readonly DocumentSelector _documentSelector = new DocumentSelector(
             new DocumentFilter
             {
-                Pattern = "**/*.ev2"
+                Language = "ev2"
             }
         );
 
@@ -46,9 +46,11 @@ namespace EV2.EV2LanguageServer
             // Clear existing diagnostics
             _lspHost.ClearDiagnotics(notification.TextDocument.Uri);
 
-            var diagnostics = await _lspHost.ValidateTextDocumentAsync(notification.TextDocument.Uri, token);
+            await _lspHost.ValidateTextDocumentAsync(notification.TextDocument.Uri, token);
 
-            _lspHost.PublishDiagnostics(diagnostics, token);
+            //var diagnostics = await _lspHost.ValidateTextDocumentAsync(notification.TextDocument.Uri, token);
+
+            //_lspHost.PublishDiagnostics(diagnostics, token);
 
             return Unit.Value;
         }
@@ -71,9 +73,11 @@ namespace EV2.EV2LanguageServer
             // Clear existing diagnostics
             _lspHost.ClearDiagnotics(notification.TextDocument.Uri);
 
-            var diagnostics = await _lspHost.ValidateTextDocumentAsync(notification.TextDocument.Uri, token);
+            await _lspHost.ValidateTextDocumentAsync(notification.TextDocument.Uri, token);
 
-            _lspHost.PublishDiagnostics(diagnostics, token);
+            //var diagnostics = await _lspHost.ValidateTextDocumentAsync(notification.TextDocument.Uri, token);
+
+            //_lspHost.PublishDiagnostics(diagnostics, token);
 
             return Unit.Value;
         }
