@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
 using EV2.CodeAnalysis;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
