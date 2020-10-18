@@ -188,7 +188,7 @@ namespace EV2
 
         private void HandleKey(ConsoleKeyInfo key, ObservableCollection<string> document, SubmissionView view)
         {
-            if (key.Modifiers == default(ConsoleModifiers))
+            if (key.Modifiers == default)
             {
                 switch (key.Key)
                 {
@@ -274,7 +274,7 @@ namespace EV2
 
         private static void InsertLine(ObservableCollection<string> document, SubmissionView view)
         {
-            var remainder = document[view.CurrentLine].Substring(view.CurrentCharacter);
+            var remainder = document[view.CurrentLine][view.CurrentCharacter..];
             document[view.CurrentLine] = document[view.CurrentLine].Substring(0, view.CurrentCharacter);
 
             var lineIndex = view.CurrentLine + 1;
@@ -328,7 +328,7 @@ namespace EV2
                 var lineIndex = view.CurrentLine;
                 var line = document[lineIndex];
                 var before = line.Substring(0, start - 1);
-                var after = line.Substring(start);
+                var after = line[start..];
                 document[lineIndex] = before + after;
                 view.CurrentCharacter--;
             }
@@ -353,7 +353,7 @@ namespace EV2
             }
 
             var before = line.Substring(0, start);
-            var after = line.Substring(start + 1);
+            var after = line[(start + 1)..];
             document[lineIndex] = before + after;
         }
 
@@ -371,7 +371,7 @@ namespace EV2
         {
             const int TabWidth = 4;
             var start = view.CurrentCharacter;
-            var remainingSpaces = TabWidth - start % TabWidth;
+            var remainingSpaces = TabWidth - (start % TabWidth);
             var line = document[view.CurrentLine];
             document[view.CurrentLine] = line.Insert(start, new string(' ', remainingSpaces));
             view.CurrentCharacter += remainingSpaces;
@@ -451,14 +451,18 @@ namespace EV2
                 else if (c == '\"')
                 {
                     if (!inQuotes)
+                    {
                         inQuotes = true;
+                    }
                     else if (l == '\"')
                     {
                         sb.Append(c);
                         position++;
                     }
                     else
+                    {
                         inQuotes = false;
+                    }
                 }
                 else
                 {
@@ -497,7 +501,7 @@ namespace EV2
             {
                 var parameterNames = string.Join(" ", parameters.Select(p => $"<{p.Name}>"));
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"error: invalid number of arguments");
+                Console.WriteLine("error: invalid number of arguments");
                 Console.WriteLine($"usage: #{command.Name} {parameterNames}");
                 Console.ResetColor();
                 return;
@@ -568,7 +572,6 @@ namespace EV2
                     Console.Out.WriteSpace();
                     for (int _ = 0; _ < maxNameLength; _++)
                         Console.Out.WriteSpace();
-
                 }
                 Console.Out.WriteSpace();
                 Console.Out.WriteSpace();

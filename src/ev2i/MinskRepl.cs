@@ -171,10 +171,7 @@ namespace EV2
 
             // Use Members because we need to exclude the EndOfFileToken.
             var lastMember = syntaxTree.Root.Members.LastOrDefault();
-            if (lastMember == null || lastMember.GetLastToken().IsMissing)
-                return false;
-
-            return true;
+            return lastMember?.GetLastToken().IsMissing == false;
         }
 
         protected override void EvaluateSubmission(string text)

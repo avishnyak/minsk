@@ -7,7 +7,7 @@ using EV2.IO;
 
 namespace EV2
 {
-    class ConsoleCompilerHost : IHost, IDisposable
+    internal class ConsoleCompilerHost : IHost, IDisposable
     {
         public int Errors = 0;
         public int Warnings = 0;

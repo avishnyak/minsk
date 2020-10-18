@@ -25,7 +25,7 @@ namespace EV2
                 { "r=", "The {path} of an assembly to reference", v => referencePaths.Add(v) },
                 { "o=", "The output {path} of the assembly to create", v => outputPath = v },
                 { "m=", "The {name} of the module", v => moduleName = v },
-                { "?|h|help", "Prints help", v => helpRequested = true },
+                { "?|h|help", "Prints help", _ => helpRequested = true },
                 { "<>", v => sourcePaths.Add(v) }
             };
 
