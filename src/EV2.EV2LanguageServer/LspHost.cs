@@ -31,16 +31,15 @@ namespace EV2.EV2LanguageServer
     {
         private readonly Uri? _workerSpaceRoot;
         private readonly int _maxNumberOfProblems = 1000;
-        private readonly IDictionary<Uri, TextDocumentInfo> _documents;
         private readonly Server _server;
         private readonly ILogger<LspHost> _logger;
         private readonly ILanguageServerFacade _languageServer;
 
-        internal IDictionary<Uri, TextDocumentInfo> Documents => _documents;
+        internal IDictionary<Uri, TextDocumentInfo> Documents { get; }
 
         public LspHost(ILogger<LspHost> logger, ILanguageServerFacade languageServer)
         {
-            _documents = new Dictionary<Uri, TextDocumentInfo>();
+            Documents = new Dictionary<Uri, TextDocumentInfo>();
             _server = new Server(this);
             _logger = logger;
             _languageServer = languageServer;
@@ -49,7 +48,7 @@ namespace EV2.EV2LanguageServer
         internal void DidOpenTextDocument(TextDocumentItem document)
         {
             _logger.LogInformation($"Document opened {document.Uri.GetFileSystemPath()} ({document.Version})");
-            _documents.Add(document.Uri, new TextDocumentInfo(document, null));
+            Documents.Add(document.Uri, new TextDocumentInfo(document, null));
         }
 
         internal void DidChangeTextDocument(VersionedTextDocumentIdentifier document, Container<TextDocumentContentChangeEvent> changes)
@@ -58,12 +57,12 @@ namespace EV2.EV2LanguageServer
 
             Uri docUri = document.Uri;
 
-            if (!_documents.ContainsKey(docUri))
+            if (!Documents.ContainsKey(docUri))
             {
                 return;
             }
 
-            var doc = _documents[docUri];
+            var doc = Documents[docUri];
 
             // We only handle a full document update right now
             doc.Document.Version = document.Version;
@@ -75,9 +74,9 @@ namespace EV2.EV2LanguageServer
             _logger.LogInformation($"Document closed {document.Uri.GetFileSystemPath()} ({document.Version})");
 
             Uri docUri = document.Uri;
-            if (_documents.ContainsKey(docUri))
+            if (Documents.ContainsKey(docUri))
             {
-                _documents.Remove(docUri);
+                Documents.Remove(docUri);
             }
         }
 
@@ -95,41 +94,18 @@ namespace EV2.EV2LanguageServer
 
         internal async Task<Compilation?> ValidateTextDocumentAsync(Uri docUri, CancellationToken cancellationToken)
         {
-            if (!_documents.ContainsKey(docUri))
+            if (!Documents.ContainsKey(docUri))
             {
                 _logger.LogError("File is not open for validation.");
                 return null;
             }
 
-            var doc = _documents[docUri];
+            var doc = Documents[docUri];
 
             doc.Compilation = await _server.Validate(doc.Document.Text, doc.Document.Uri.GetFileSystemPath(), cancellationToken);
 
             return doc.Compilation;
         }
-
-        // void ValidateTextDocument(TextDocumentItem document)
-        // {
-        //     _logger.LogInformation($"Validating {document.Uri.GetFileSystemPath()} ({document.Version})");
-
-        //     var validationTask = Task.Run(() => _server.Validate(document.text, document.uri.ToString(), CancellationToken), CancellationToken);
-
-        //     try
-        //     {
-        //         var diagnostics = validationTask.Result;
-
-        //         if (diagnostics.Count() > 0)
-        //         {
-        //             Logger.Instance.Info($"Found {diagnostics.Count()} issues.");
-        //         }
-        //     }
-        //     catch (AggregateException ae)
-        //     {
-        //         Logger.Instance.Error(ae.ToString());
-        //     }
-
-        //     // TODO: Save syntax tree in LRU cache
-        // }
 
         public void RequestShutdown()
         {

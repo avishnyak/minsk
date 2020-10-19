@@ -7,7 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Server;
 
 namespace EV2.EV2LanguageServer
 {
-    class Program
+    public static class Program
     {
         private static void Main(string[] args)
         {
