@@ -28,6 +28,7 @@ namespace EV2.CodeAnalysis
         public FunctionSymbol? MainFunction => GlobalScope.MainFunction;
         public ImmutableArray<FunctionSymbol> Functions => GlobalScope.Functions;
         public ImmutableArray<VariableSymbol> Variables => GlobalScope.Variables;
+        public ImmutableArray<StructSymbol> Structs => GlobalScope.Structs;
 
         internal BoundGlobalScope GlobalScope
         {
@@ -52,6 +53,10 @@ namespace EV2.CodeAnalysis
 
             while (submission != null)
             {
+                foreach (var @struct in submission.Structs)
+                    if (seenSymbolNames.Add(@struct.Name))
+                        yield return @struct;
+
                 foreach (var function in submission.Functions)
                     if (seenSymbolNames.Add(function.Name))
                         yield return function;
