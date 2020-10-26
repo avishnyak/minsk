@@ -1,0 +1,11 @@
+struct Point
+{
+    var x = 0
+    var y = 0
+}
+
+function main()
+{
+    print("Hello world")
+    var p: Point = Point(1, 1)
+}

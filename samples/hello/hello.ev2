@@ -1,4 +1,50 @@
 function main()
 {
+    // Hello world
     print("Hello world!")
+
+    // Variable types
+    var str_var: string = "Hello"
+    var int_type: int = 123
+    var bool_type: bool = false
+
+    print(str_var)
+    print(int_type)
+    print(bool_type)
+
+    // Variables with implied types
+    var str_var2 = "Hello"
+    var int_type2 = 123
+    var bool_type2 = false
+
+    print(str_var2)
+    print(int_type2)
+    print(bool_type2)
+
+    // Variables with implied defaults
+    var str_var3: string
+    var int_type3: int
+    var bool_type3: bool
+
+    print(str_var3)
+    print(int_type3)
+    print(bool_type3)
+
+    // Variables with explicit defaults
+    var str_var4: string = default
+    var int_type4: int = default
+    var bool_type4: bool = default
+
+    print(str_var4)
+    print(int_type4)
+    print(bool_type4)
+
+    // Variables that cannot be re-assigned (ie. constants)
+    let const_name = "Const Hello"
+    let const_int = 321
+    let const_bool = false
+
+    print(const_name)
+    print(const_int)
+    print(const_bool)
 }

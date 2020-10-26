@@ -12,6 +12,7 @@ namespace EV2.Tests.Snippets
     {
         [Theory]
         [InlineData("hello")]
+        [InlineData("structs")]
         public async Task SamplesTests(string filenamePrefix)
         {
             ProcessStartInfo psi = new ProcessStartInfo
@@ -32,9 +33,32 @@ namespace EV2.Tests.Snippets
             using Process process = Process.Start(psi);
             using ManualResetEvent mreOut = new ManualResetEvent(false), mreErr = new ManualResetEvent(false);
 
-            process.OutputDataReceived += (o, e) => { if (e.Data == null) mreOut.Set(); else output.Append(e.Data); };
+            process.OutputDataReceived += (o, e) =>
+            {
+                if (e.Data == null)
+                {
+                    mreOut.Set();
+                }
+                else
+                {
+                    output.Append(e.Data);
+                    output.Append(Environment.NewLine);
+                }
+            };
             process.BeginOutputReadLine();
-            process.ErrorDataReceived += (o, e) => { if (e.Data == null) mreErr.Set(); else output.Append(e.Data); };
+
+            process.ErrorDataReceived += (o, e) =>
+            {
+                if (e.Data == null)
+                {
+                    mreErr.Set();
+                }
+                else
+                {
+                    output.Append(e.Data);
+                    output.Append(Environment.NewLine);
+                }
+            };
             process.BeginErrorReadLine();
 
             process.StandardInput.Close();
@@ -43,9 +67,8 @@ namespace EV2.Tests.Snippets
             mreOut.WaitOne();
             mreErr.WaitOne();
 
-
             // Compare stdout to outputfile
-            var outputPath = Path.GetFullPath(Path.Combine( @"..\..\..\..\samples", filenamePrefix, filenamePrefix + ".out"));
+            var outputPath = Path.GetFullPath(Path.Combine(@"..\..\..\..\samples", filenamePrefix, filenamePrefix + ".out"));
 
             Assert.Equal(await File.ReadAllTextAsync(outputPath), output.ToString());
         }
