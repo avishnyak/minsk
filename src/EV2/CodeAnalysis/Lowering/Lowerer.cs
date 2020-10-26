@@ -22,15 +22,24 @@ namespace EV2.CodeAnalysis.Lowering
             return new BoundLabel(name);
         }
 
-        public static BoundBlockStatement Lower(FunctionSymbol function, BoundStatement statement)
+        public static BoundBlockStatement Lower(Symbol symbol, BoundStatement statement)
         {
+            if (!(symbol is FunctionSymbol || symbol is StructSymbol))
+            {
+                throw new Exception($"Symbol of type {symbol.Kind} not expected in Lowerer.");
+            }
+
             var lowerer = new Lowerer();
             var result = lowerer.RewriteStatement(statement);
-            return RemoveDeadCode(Flatten(function, result));
+
+            return RemoveDeadCode(Flatten(symbol, result));
         }
 
-        private static BoundBlockStatement Flatten(FunctionSymbol function, BoundStatement statement)
+        private static BoundBlockStatement Flatten(Symbol function, BoundStatement statement)
         {
+            // TODO: Take into account nested scopes when Flattening.  The compiler allows a naming collision
+            // to occur if separate scope blocks contain identically named symbols.
+
             var builder = ImmutableArray.CreateBuilder<BoundStatement>();
             var stack = new Stack<BoundStatement>();
             stack.Push(statement);
@@ -50,7 +59,7 @@ namespace EV2.CodeAnalysis.Lowering
                 }
             }
 
-            if (function.Type == TypeSymbol.Void)
+            if (function is FunctionSymbol f && f.Type == TypeSymbol.Void)
             {
                 if (builder.Count == 0 || CanFallThrough(builder.Last()))
                 {
@@ -70,10 +79,9 @@ namespace EV2.CodeAnalysis.Lowering
         private static BoundBlockStatement RemoveDeadCode(BoundBlockStatement node)
         {
             var controlFlow = ControlFlowGraph.Create(node);
-            var reachableStatements = new HashSet<BoundStatement>(
-                controlFlow.Blocks.SelectMany(b => b.Statements));
-
+            var reachableStatements = new HashSet<BoundStatement>(controlFlow.Blocks.SelectMany(b => b.Statements));
             var builder = node.Statements.ToBuilder();
+
             for (int i = builder.Count - 1; i >= 0; i--)
             {
                 if (!reachableStatements.Contains(builder[i]))
@@ -82,6 +90,7 @@ namespace EV2.CodeAnalysis.Lowering
 
             return new BoundBlockStatement(node.Syntax, builder.ToImmutable());
         }
+
 
         protected override BoundStatement RewriteIfStatement(BoundIfStatement node)
         {

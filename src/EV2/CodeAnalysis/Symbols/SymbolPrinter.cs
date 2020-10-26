@@ -26,6 +26,9 @@ namespace EV2.CodeAnalysis.Symbols
                 case SymbolKind.Type:
                     WriteTypeTo((TypeSymbol)symbol, writer);
                     break;
+                case SymbolKind.Struct:
+                    WriteStructTo((StructSymbol)symbol, writer);
+                    break;
                 default:
                     throw new Exception($"Unexpected symbol: {symbol.Kind}");
             }
@@ -85,6 +88,13 @@ namespace EV2.CodeAnalysis.Symbols
             writer.WritePunctuation(SyntaxKind.ColonToken);
             writer.WriteSpace();
             symbol.Type.WriteTo(writer);
+        }
+
+        private static void WriteStructTo(StructSymbol @struct, TextWriter writer)
+        {
+            writer.WriteKeyword(SyntaxKind.StructKeyword);
+            writer.WriteSpace();
+            writer.WriteIdentifier(@struct.Name);
         }
 
         private static void WriteTypeTo(TypeSymbol symbol, TextWriter writer)

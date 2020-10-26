@@ -1,7 +1,7 @@
+using EV2.CodeAnalysis.Symbols;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using EV2.CodeAnalysis.Symbols;
 
 namespace EV2.CodeAnalysis.Binding
 {
@@ -22,6 +22,9 @@ namespace EV2.CodeAnalysis.Binding
         public bool TryDeclareFunction(FunctionSymbol function)
             => TryDeclareSymbol(function);
 
+        public bool TryDeclareStruct(StructSymbol @struct)
+            => TryDeclareSymbol(@struct);
+
         private bool TryDeclareSymbol<TSymbol>(TSymbol symbol)
             where TSymbol : Symbol
         {
@@ -31,6 +34,7 @@ namespace EV2.CodeAnalysis.Binding
                 return false;
 
             _symbols.Add(symbol.Name, symbol);
+
             return true;
         }
 
@@ -47,6 +51,9 @@ namespace EV2.CodeAnalysis.Binding
 
         public ImmutableArray<FunctionSymbol> GetDeclaredFunctions()
             => GetDeclaredSymbols<FunctionSymbol>();
+
+        public ImmutableArray<StructSymbol> GetDeclaredStructs()
+            => GetDeclaredSymbols<StructSymbol>();
 
         private ImmutableArray<TSymbol> GetDeclaredSymbols<TSymbol>()
             where TSymbol : Symbol

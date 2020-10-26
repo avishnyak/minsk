@@ -92,6 +92,10 @@ namespace EV2.CodeAnalysis.Syntax
                     return SyntaxKind.WhileKeyword;
                 case "do":
                     return SyntaxKind.DoKeyword;
+                case "struct":
+                    return SyntaxKind.StructKeyword;
+                case "default":
+                    return SyntaxKind.DefaultKeyword;
                 default:
                     return SyntaxKind.IdentifierToken;
             }
@@ -211,6 +215,10 @@ namespace EV2.CodeAnalysis.Syntax
                     return "while";
                 case SyntaxKind.DoKeyword:
                     return "do";
+                case SyntaxKind.StructKeyword:
+                    return "struct";
+                case SyntaxKind.DefaultKeyword:
+                    return "default";
                 default:
                     return null;
             }

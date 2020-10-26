@@ -63,10 +63,13 @@ namespace EV2.CodeAnalysis.Syntax
         VarKeyword,
         WhileKeyword,
         DoKeyword,
+        StructKeyword,
+        DefaultKeyword,
 
         // Nodes
         CompilationUnit,
         FunctionDeclaration,
+        StructDeclaration,
         GlobalStatement,
         Parameter,
         TypeClause,
@@ -74,6 +77,7 @@ namespace EV2.CodeAnalysis.Syntax
 
         // Statements
         BlockStatement,
+        MemberBlockStatement,
         VariableDeclaration,
         IfStatement,
         WhileStatement,

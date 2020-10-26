@@ -127,6 +127,9 @@ namespace EV2.CodeAnalysis.Syntax
             if (Current.Kind == SyntaxKind.FunctionKeyword)
                 return ParseFunctionDeclaration();
 
+            if (Current.Kind == SyntaxKind.StructKeyword)
+                return ParseStructDeclaration();
+
             return ParseGlobalStatement();
         }
 
@@ -139,19 +142,21 @@ namespace EV2.CodeAnalysis.Syntax
             var closeParenthesisToken = MatchToken(SyntaxKind.CloseParenthesisToken);
             var type = ParseOptionalTypeClause();
             var body = ParseBlockStatement();
+
             return new FunctionDeclarationSyntax(_syntaxTree, functionKeyword, identifier, openParenthesisToken, parameters, closeParenthesisToken, type, body);
         }
 
         private SeparatedSyntaxList<ParameterSyntax> ParseParameterList()
         {
             var nodesAndSeparators = ImmutableArray.CreateBuilder<SyntaxNode>();
-
             var parseNextParameter = true;
+
             while (parseNextParameter &&
                    Current.Kind != SyntaxKind.CloseParenthesisToken &&
                    Current.Kind != SyntaxKind.EndOfFileToken)
             {
                 var parameter = ParseParameter();
+
                 nodesAndSeparators.Add(parameter);
 
                 if (Current.Kind == SyntaxKind.CommaToken)
@@ -239,15 +244,67 @@ namespace EV2.CodeAnalysis.Syntax
             return new BlockStatementSyntax(_syntaxTree, openBraceToken, statements.ToImmutable(), closeBraceToken);
         }
 
+        private MemberSyntax ParseStructDeclaration()
+        {
+            var keyword = MatchToken(SyntaxKind.StructKeyword);
+            var identifier = MatchToken(SyntaxKind.IdentifierToken);
+            var body = ParseStructBlockStatement();
+
+            return new StructDeclarationSyntax(_syntaxTree, keyword, identifier, body);
+        }
+
+        private MemberBlockStatementSyntax ParseStructBlockStatement()
+        {
+            var statements = ImmutableArray.CreateBuilder<StatementSyntax>();
+
+            var openBraceToken = MatchToken(SyntaxKind.OpenBraceToken);
+
+            while (Current.Kind != SyntaxKind.EndOfFileToken &&
+                   Current.Kind != SyntaxKind.CloseBraceToken)
+            {
+                var startToken = Current;
+
+                var statement = ParseVariableDeclaration();
+                statements.Add(statement);
+
+                // If ParseStatement() did not consume any tokens,
+                // we need to skip the current token and continue
+                // in order to avoid an infinite loop.
+                //
+                // We don't need to report an error, because we'll
+                // already tried to parse an expression statement
+                // and reported one.
+                if (Current == startToken)
+                    NextToken();
+            }
+
+            var closeBraceToken = MatchToken(SyntaxKind.CloseBraceToken);
+
+            return new MemberBlockStatementSyntax(_syntaxTree, openBraceToken, statements.ToImmutable(), closeBraceToken);
+        }
+
         private StatementSyntax ParseVariableDeclaration()
         {
             var expected = Current.Kind == SyntaxKind.LetKeyword ? SyntaxKind.LetKeyword : SyntaxKind.VarKeyword;
             var keyword = MatchToken(expected);
             var identifier = MatchToken(SyntaxKind.IdentifierToken);
+
             var typeClause = ParseOptionalTypeClause();
-            var equals = MatchToken(SyntaxKind.EqualsToken);
-            var initializer = ParseExpression();
-            return new VariableDeclarationSyntax(_syntaxTree, keyword, identifier, typeClause, equals, initializer);
+
+            // A type can be omitted when it can be inferred from the initializer
+            // An initializer can be omitted when a type is present AND the variable is not read-only
+            // A variable that is read-only must be initialized
+            if (typeClause == null || Current.Kind == SyntaxKind.EqualsToken || expected == SyntaxKind.LetKeyword)
+            {
+                var equals = MatchToken(SyntaxKind.EqualsToken);
+                var initializer = ParseExpression();
+
+                return new VariableDeclarationSyntax(_syntaxTree, keyword, identifier, typeClause, equals, initializer);
+            }
+            else
+            {
+                return new VariableDeclarationSyntax(_syntaxTree, keyword, identifier, typeClause, null, null);
+            }
         }
 
         private TypeClauseSyntax? ParseOptionalTypeClause()
@@ -417,10 +474,19 @@ namespace EV2.CodeAnalysis.Syntax
                 case SyntaxKind.StringToken:
                     return ParseStringLiteral();
 
+                case SyntaxKind.DefaultKeyword:
+                    return ParseDefaultLiteral();
+
                 case SyntaxKind.IdentifierToken:
                 default:
                     return ParseNameOrCallExpression();
             }
+        }
+
+        private ExpressionSyntax ParseDefaultLiteral()
+        {
+            var defaultKeywordToken = MatchToken(SyntaxKind.DefaultKeyword);
+            return new DefaultKeywordSyntax(_syntaxTree, defaultKeywordToken);
         }
 
         private ExpressionSyntax ParseParenthesizedExpression()

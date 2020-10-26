@@ -17,9 +17,12 @@ namespace EV2.CodeAnalysis.Emit
 {
     internal sealed class Emitter
     {
+        private const TypeAttributes _classAttributes = TypeAttributes.Class | TypeAttributes.NotPublic | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit;
+
         private DiagnosticBag _diagnostics = new DiagnosticBag();
 
         private readonly Dictionary<TypeSymbol, TypeReference> _knownTypes;
+        private readonly MethodReference _objectCtor;
         private readonly MethodReference _objectEqualsReference;
         private readonly MethodReference _consoleReadLineReference;
         private readonly MethodReference _consoleWriteLineReference;
@@ -35,6 +38,7 @@ namespace EV2.CodeAnalysis.Emit
         private readonly MethodReference _randomCtorReference;
         private readonly MethodReference _randomNextReference;
         private readonly AssemblyDefinition _assemblyDefinition;
+        private readonly Dictionary<StructSymbol, TypeDefinition> _structs = new Dictionary<StructSymbol, TypeDefinition>();
         private readonly Dictionary<FunctionSymbol, MethodDefinition> _methods = new Dictionary<FunctionSymbol, MethodDefinition>();
         private readonly Dictionary<VariableSymbol, VariableDefinition> _locals = new Dictionary<VariableSymbol, VariableDefinition>();
         private readonly Dictionary<BoundLabel, int> _labels = new Dictionary<BoundLabel, int>();
@@ -89,8 +93,7 @@ namespace EV2.CodeAnalysis.Emit
                                            .ToArray();
                 if (foundTypes.Length == 1)
                 {
-                    var typeReference = _assemblyDefinition.MainModule.ImportReference(foundTypes[0]);
-                    return typeReference;
+                    return _assemblyDefinition.MainModule.ImportReference(foundTypes[0]);
                 }
                 else if (foundTypes.Length == 0)
                 {
@@ -110,6 +113,7 @@ namespace EV2.CodeAnalysis.Emit
                                            .SelectMany(m => m.Types)
                                            .Where(t => t.FullName == typeName)
                                            .ToArray();
+
                 if (foundTypes.Length == 1)
                 {
                     var foundType = foundTypes[0];
@@ -152,6 +156,7 @@ namespace EV2.CodeAnalysis.Emit
                 return null!;
             }
 
+            _objectCtor = ResolveMethod("System.Object", ".ctor", Array.Empty<string>());
             _objectEqualsReference = ResolveMethod("System.Object", "Equals", new [] { "System.Object", "System.Object" });
             _consoleReadLineReference = ResolveMethod("System.Console", "ReadLine", Array.Empty<string>());
             _consoleWriteLineReference = ResolveMethod("System.Console", "WriteLine", new [] { "System.Object" });
@@ -168,6 +173,7 @@ namespace EV2.CodeAnalysis.Emit
             _debuggableAttributeCtorReference = ResolveMethod("System.Diagnostics.DebuggableAttribute", ".ctor", new [] { "System.Boolean", "System.Boolean" });
 
             var objectType = _knownTypes[TypeSymbol.Any];
+
             if (objectType != null)
             {
                 _typeDefinition = new TypeDefinition("", "Program", TypeAttributes.Abstract | TypeAttributes.Sealed, objectType);
@@ -192,6 +198,12 @@ namespace EV2.CodeAnalysis.Emit
         {
             if (_diagnostics.Any())
                 return _diagnostics.ToImmutableArray();
+
+            foreach (var structWithBody in program.Structs)
+                EmitStructDeclaration(structWithBody.Key);
+
+            foreach (var structWithBody in program.Structs)
+                EmitStructBody(structWithBody.Key, structWithBody.Value);
 
             foreach (var functionWithBody in program.Functions)
                 EmitFunctionDeclaration(functionWithBody.Key);
@@ -225,6 +237,122 @@ namespace EV2.CodeAnalysis.Emit
             return _diagnostics.ToImmutableArray();
         }
 
+        private void EmitStructDeclaration(StructSymbol key)
+        {
+            // Structs are actually implemented as classes to align more closely with the C-style understanding of structs.
+            // They are reference types rather than the .NET value types.
+            var classType = new TypeDefinition("", key.Name, _classAttributes, _knownTypes[TypeSymbol.Any]);
+
+            _assemblyDefinition.MainModule.Types.Add(classType);
+            _structs.Add(key, classType);
+            _knownTypes.Add(key, classType);
+        }
+
+        private void EmitStructBody(StructSymbol key, BoundBlockStatement value)
+        {
+            var structType = _structs[key];
+
+            EmitEmptyConstructorForStruct(value, structType);
+            EmitDefaultConstructorForStruct(key, value, structType);
+        }
+
+        private void EmitEmptyConstructorForStruct(BoundBlockStatement value, TypeDefinition structType)
+        {
+            // Create empty constructor
+            var constructor = new MethodDefinition(
+                ".ctor",
+                MethodAttributes.Public |
+                MethodAttributes.SpecialName |
+                MethodAttributes.RTSpecialName |
+                MethodAttributes.HideBySig,
+                _knownTypes[TypeSymbol.Void]
+            );
+
+            structType.Methods.Insert(0, constructor);
+
+            var ilProcessor = constructor.Body.GetILProcessor();
+
+            foreach (var field in value.Statements)
+            {
+                if (field is BoundVariableDeclaration d)
+                {
+                    var fieldAttributes = d.Variable.IsReadOnly ? FieldAttributes.Public | FieldAttributes.InitOnly : FieldAttributes.Public;
+                    var fieldDefinition = new FieldDefinition(d.Variable.Name, fieldAttributes, _knownTypes[d.Variable.Type]);
+                    structType.Fields.Add(fieldDefinition);
+
+                    EmitFieldAssignment(ilProcessor, d, fieldDefinition);
+                }
+                else if (field is BoundSequencePointStatement s && s.Statement is BoundVariableDeclaration sd)
+                {
+                    var fieldAttributes = sd.Variable.IsReadOnly ? FieldAttributes.Public | FieldAttributes.InitOnly : FieldAttributes.Public;
+                    var fieldDefinition = new FieldDefinition(sd.Variable.Name, fieldAttributes, _knownTypes[sd.Variable.Type]);
+                    structType.Fields.Add(fieldDefinition);
+
+                    EmitSequencePointStatement(ilProcessor, s);
+                    EmitFieldAssignment(ilProcessor, sd, fieldDefinition);
+                }
+                else
+                {
+                    throw new Exception($"Unexpected statement type {field.Kind}. Expected BoundVariableDeclaration.");
+                }
+            }
+
+            ilProcessor.Emit(OpCodes.Ldarg_0);
+            ilProcessor.Emit(OpCodes.Call, _objectCtor);
+            ilProcessor.Emit(OpCodes.Ret);
+
+            constructor.Body.Optimize();
+        }
+
+        private void EmitDefaultConstructorForStruct(StructSymbol @struct, BoundBlockStatement value, TypeDefinition structType)
+        {
+            // Create empty constructor
+            var constructor = new MethodDefinition(
+                ".ctor",
+                MethodAttributes.Public |
+                MethodAttributes.SpecialName |
+                MethodAttributes.RTSpecialName |
+                MethodAttributes.HideBySig,
+                _knownTypes[TypeSymbol.Void]
+            );
+
+            // This constructor will be the second one on the class
+            structType.Methods.Insert(1, constructor);
+
+            var ilProcessor = constructor.Body.GetILProcessor();
+
+            // Call base .ctor(), which sould in turn call the object.ctor()
+            ilProcessor.Emit(OpCodes.Ldarg_0);
+            ilProcessor.Emit(OpCodes.Call, structType.Methods[0]);
+
+            // Assign each parameter
+            for (int i = 0; i < @struct.CtorParameters.Length; i++)
+            {
+                var ctorParam = @struct.CtorParameters[i];
+                var paramType = _knownTypes[ctorParam.Type];
+                const ParameterAttributes parameterAttributes = ParameterAttributes.None;
+                var parameterDefinition = new ParameterDefinition(ctorParam.Name, parameterAttributes, paramType);
+
+                constructor.Parameters.Add(parameterDefinition);
+
+                ilProcessor.Emit(OpCodes.Ldarg_0);
+                ilProcessor.Emit(OpCodes.Ldarg, i + 1);
+
+                foreach (var field in structType.Fields)
+                {
+                    if (field.Name == ctorParam.Name)
+                    {
+                        ilProcessor.Emit(OpCodes.Stfld, field);
+                        break;
+                    }
+                }
+            }
+
+            ilProcessor.Emit(OpCodes.Ret);
+
+            constructor.Body.Optimize();
+        }
+
         private void EmitFunctionDeclaration(FunctionSymbol function)
         {
             var functionType = _knownTypes[function.Type];
@@ -233,8 +361,9 @@ namespace EV2.CodeAnalysis.Emit
             foreach (var parameter in function.Parameters)
             {
                 var parameterType = _knownTypes[parameter.Type];
-                var parameterAttributes = ParameterAttributes.None;
+                const ParameterAttributes parameterAttributes = ParameterAttributes.None;
                 var parameterDefinition = new ParameterDefinition(parameter.Name, parameterAttributes, parameterType);
+
                 method.Parameters.Add(parameterDefinition);
             }
 
@@ -274,6 +403,7 @@ namespace EV2.CodeAnalysis.Emit
                 var symbol = local.Key;
                 var definition = local.Value;
                 var debugInfo = new VariableDebugInformation(definition, symbol.Name);
+
                 method.DebugInformation.Scope.Variables.Add(debugInfo);
             }
         }
@@ -314,6 +444,17 @@ namespace EV2.CodeAnalysis.Emit
         private void EmitNopStatement(ILProcessor ilProcessor, BoundNopStatement node)
         {
             ilProcessor.Emit(OpCodes.Nop);
+        }
+
+        private void EmitFieldAssignment(ILProcessor ilProcessor, BoundVariableDeclaration node, FieldDefinition field)
+        {
+            ilProcessor.Emit(OpCodes.Ldarg_0);
+
+            if (node.Initializer.ConstantValue != null)
+            {
+                EmitConstantExpression(ilProcessor, node.Initializer);
+                ilProcessor.Emit(OpCodes.Stfld, field);
+            }
         }
 
         private void EmitVariableDeclaration(ILProcessor ilProcessor, BoundVariableDeclaration node)
@@ -709,6 +850,8 @@ namespace EV2.CodeAnalysis.Emit
 
         private void EmitCallExpression(ILProcessor ilProcessor, BoundCallExpression node)
         {
+            // Debugger.Launch();
+
             if (node.Function == BuiltinFunctions.Rnd)
             {
                 if (_randomFieldDefinition == null)
@@ -733,6 +876,12 @@ namespace EV2.CodeAnalysis.Emit
             else if (node.Function == BuiltinFunctions.Print)
             {
                 ilProcessor.Emit(OpCodes.Call, _consoleWriteLineReference);
+            }
+            else if (node.Function.Name.EndsWith(".ctor"))
+            {
+                var className = node.Function.Name[..^5];
+                var @struct = _structs.First(s => s.Key.Name == className).Value;
+                ilProcessor.Emit(OpCodes.Newobj, @struct.Methods[1]);
             }
             else
             {

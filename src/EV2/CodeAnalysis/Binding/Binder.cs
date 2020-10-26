@@ -12,7 +12,6 @@ namespace EV2.CodeAnalysis.Binding
 {
     internal sealed class Binder
     {
-        private readonly DiagnosticBag _diagnostics = new DiagnosticBag();
         private readonly bool _isScript;
         private readonly FunctionSymbol? _function;
 
@@ -39,15 +38,33 @@ namespace EV2.CodeAnalysis.Binding
             var binder = new Binder(isScript, parentScope, function: null);
 
             binder.Diagnostics.AddRange(syntaxTrees.SelectMany(st => st.Diagnostics));
-            if (binder.Diagnostics.Any())
-                return new BoundGlobalScope(previous, binder.Diagnostics.ToImmutableArray(), null, null, ImmutableArray<FunctionSymbol>.Empty, ImmutableArray<VariableSymbol>.Empty, ImmutableArray<BoundStatement>.Empty);
 
+            if (binder.Diagnostics.Any())
+                return new BoundGlobalScope(
+                    previous,
+                    binder.Diagnostics.ToImmutableArray(),
+                    null,
+                    null,
+                    ImmutableArray<StructSymbol>.Empty,
+                    ImmutableArray<FunctionSymbol>.Empty,
+                    ImmutableArray<VariableSymbol>.Empty,
+                    ImmutableArray<BoundStatement>.Empty);
+
+            // Phase 1: Forward declare structs
+            var structDeclarations = syntaxTrees.SelectMany(st => st.Root.Members)
+                                               .OfType<StructDeclarationSyntax>();
+
+            foreach (var @struct in structDeclarations)
+                binder.BindStructDeclaration(@struct);
+
+            // Phase 2: Forward declare functions
             var functionDeclarations = syntaxTrees.SelectMany(st => st.Root.Members)
                                                   .OfType<FunctionDeclarationSyntax>();
 
             foreach (var function in functionDeclarations)
                 binder.BindFunctionDeclaration(function);
 
+            // Phase 3: Bind all global statements
             var globalStatements = syntaxTrees.SelectMany(st => st.Root.Members)
                                               .OfType<GlobalStatementSyntax>();
 
@@ -60,7 +77,6 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             // Check global statements
-
             var firstGlobalStatementPerSyntaxTree = syntaxTrees.Select(st => st.Root.Members.OfType<GlobalStatementSyntax>().FirstOrDefault())
                                                                 .Where(g => g != null)
                                                                 .ToArray();
@@ -119,11 +135,12 @@ namespace EV2.CodeAnalysis.Binding
 
             var diagnostics = binder.Diagnostics.ToImmutableArray();
             var variables = binder._scope.GetDeclaredVariables();
+            var structs = binder._scope.GetDeclaredStructs();
 
             if (previous != null)
                 diagnostics = diagnostics.InsertRange(0, previous.Diagnostics);
 
-            return new BoundGlobalScope(previous, diagnostics, mainFunction, scriptFunction, functions, variables, statements.ToImmutable());
+            return new BoundGlobalScope(previous, diagnostics, mainFunction, scriptFunction, structs, functions, variables, statements.ToImmutable());
         }
 
         public static BoundProgram BindProgram(bool isScript, BoundProgram? previous, BoundGlobalScope globalScope)
@@ -131,19 +148,43 @@ namespace EV2.CodeAnalysis.Binding
             var parentScope = CreateParentScope(globalScope);
 
             if (globalScope.Diagnostics.Any())
-                return new BoundProgram(previous, globalScope.Diagnostics, null, null, ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty);
+                return new BoundProgram(
+                    previous,
+                    globalScope.Diagnostics,
+                    null,
+                    null,
+                    ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty,
+                    ImmutableDictionary<StructSymbol, BoundBlockStatement>.Empty);
 
             var functionBodies = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
+            var structBodies = ImmutableDictionary.CreateBuilder<StructSymbol, BoundBlockStatement>();
             var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+
+            foreach (var @struct in globalScope.Structs)
+            {
+                var binder = new Binder(isScript, parentScope, null);
+                var body = binder.BindMemberBlockStatement(@struct.Declaration!.Body);
+                var loweredBody = Lowerer.Lower(@struct, body);
+
+                structBodies.Add(@struct, loweredBody);
+
+                diagnostics.AddRange(binder.Diagnostics);
+            }
 
             foreach (var function in globalScope.Functions)
             {
+                // Structs generate declartions for their constructors.  However, these have no function bodies.
+                // We will skip attempting to lower the bodies for these and allow the Emitter to automatically
+                // generate the code necessary.  This will avoid the potential of reporting diagnostic errors to
+                // the user for code they never wrote.
+                if (function.Type is StructSymbol) { continue;  }
+
                 var binder = new Binder(isScript, parentScope, function);
                 var body = binder.BindStatement(function.Declaration!.Body);
                 var loweredBody = Lowerer.Lower(function, body);
 
                 if (function.Type != TypeSymbol.Void && !ControlFlowGraph.AllPathsReturn(loweredBody))
-                    binder._diagnostics.ReportAllPathsMustReturn(function.Declaration.Identifier.Location);
+                    binder.Diagnostics.ReportAllPathsMustReturn(function.Declaration.Identifier.Location);
 
                 functionBodies.Add(function, loweredBody);
 
@@ -162,6 +203,7 @@ namespace EV2.CodeAnalysis.Binding
             else if (globalScope.ScriptFunction != null)
             {
                 var statements = globalScope.Statements;
+
                 if (statements.Length == 1 &&
                     statements[0] is BoundExpressionStatement es &&
                     es.Expression.Type != TypeSymbol.Void)
@@ -182,7 +224,54 @@ namespace EV2.CodeAnalysis.Binding
                                     diagnostics.ToImmutable(),
                                     globalScope.MainFunction,
                                     globalScope.ScriptFunction,
-                                    functionBodies.ToImmutable());
+                                    functionBodies.ToImmutable(),
+                                    structBodies.ToImmutable());
+        }
+
+        private void BindStructDeclaration(StructDeclarationSyntax syntax)
+        {
+            // Peek into the struct body and generate a constructor based on all writeable members
+            var members = syntax.Body.Statement.OfType<VariableDeclarationSyntax>()
+                                               .Where(m => m.Keyword.Kind == SyntaxKind.VarKeyword);
+
+            var ctorParameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
+
+            foreach (var varDeclarationSyntax in members)
+            {
+                var parameterName = varDeclarationSyntax.Identifier.Text;
+                var parameterType = BindTypeClause(varDeclarationSyntax.TypeClause);
+
+                if (parameterType == null && varDeclarationSyntax.Initializer != null)
+                {
+                    parameterType = BindExpression(varDeclarationSyntax.Initializer).Type;
+                }
+                else
+                {
+                    // We don't need to do error reporting here (e.g. report on duplicate members) because that will be
+                    // done later in the BindMemberBlockStatement
+                    continue;
+                }
+                
+                var parameter = new ParameterSymbol(parameterName, parameterType, ctorParameters.Count);
+
+                ctorParameters.Add(parameter);
+            }
+
+            string structIdentifier = syntax.Identifier.Text;
+            var @struct = new StructSymbol(structIdentifier, ctorParameters.ToImmutable(), syntax);
+
+            if (structIdentifier != null && !_scope.TryDeclareStruct(@struct))
+            {
+                Diagnostics.ReportSymbolAlreadyDeclared(syntax.Identifier.Location, @struct.Name);
+            }
+
+            // Declare Built-in Constructor
+            var function = new FunctionSymbol(structIdentifier + ".ctor", ctorParameters.ToImmutable(), @struct);
+
+            if (structIdentifier != null && !_scope.TryDeclareFunction(function))
+            {
+                Diagnostics.ReportSymbolAlreadyDeclared(syntax.Identifier.Location, function.Name);
+            }
         }
 
         private void BindFunctionDeclaration(FunctionDeclarationSyntax syntax)
@@ -195,13 +284,15 @@ namespace EV2.CodeAnalysis.Binding
             {
                 var parameterName = parameterSyntax.Identifier.Text;
                 var parameterType = BindTypeClause(parameterSyntax.Type);
+
                 if (!seenParameterNames.Add(parameterName))
                 {
-                    _diagnostics.ReportParameterAlreadyDeclared(parameterSyntax.Location, parameterName);
+                    Diagnostics.ReportParameterAlreadyDeclared(parameterSyntax.Location, parameterName);
                 }
                 else
                 {
                     var parameter = new ParameterSymbol(parameterName, parameterType, parameters.Count);
+
                     parameters.Add(parameter);
                 }
             }
@@ -209,16 +300,17 @@ namespace EV2.CodeAnalysis.Binding
             var type = BindTypeClause(syntax.Type) ?? TypeSymbol.Void;
 
             var function = new FunctionSymbol(syntax.Identifier.Text, parameters.ToImmutable(), type, syntax);
-            if (syntax.Identifier.Text != null &&
-                !_scope.TryDeclareFunction(function))
+
+            if (syntax.Identifier.Text != null && !_scope.TryDeclareFunction(function))
             {
-                _diagnostics.ReportSymbolAlreadyDeclared(syntax.Identifier.Location, function.Name);
+                Diagnostics.ReportSymbolAlreadyDeclared(syntax.Identifier.Location, function.Name);
             }
         }
 
         private static BoundScope CreateParentScope(BoundGlobalScope? previous)
         {
             var stack = new Stack<BoundGlobalScope>();
+
             while (previous != null)
             {
                 stack.Push(previous);
@@ -230,7 +322,11 @@ namespace EV2.CodeAnalysis.Binding
             while (stack.Count > 0)
             {
                 previous = stack.Pop();
+
                 var scope = new BoundScope(parent);
+
+                foreach (var s in previous.Structs)
+                    scope.TryDeclareStruct(s);
 
                 foreach (var f in previous.Functions)
                     scope.TryDeclareFunction(f);
@@ -254,7 +350,7 @@ namespace EV2.CodeAnalysis.Binding
             return result;
         }
 
-        public DiagnosticBag Diagnostics => _diagnostics;
+        public DiagnosticBag Diagnostics { get; } = new DiagnosticBag();
 
         private BoundStatement BindErrorStatement(SyntaxNode syntax)
         {
@@ -278,12 +374,32 @@ namespace EV2.CodeAnalysis.Binding
                                               es.Expression.Kind == BoundNodeKind.AssignmentExpression ||
                                               es.Expression.Kind == BoundNodeKind.CallExpression ||
                                               es.Expression.Kind == BoundNodeKind.CompoundAssignmentExpression;
+
                     if (!isAllowedExpression)
-                        _diagnostics.ReportInvalidExpressionStatement(syntax.Location);
+                        Diagnostics.ReportInvalidExpressionStatement(syntax.Location);
                 }
             }
 
             return result;
+        }
+
+        private BoundStatement BindMemberBlockStatement(MemberBlockStatementSyntax syntax)
+        {
+            var statements = ImmutableArray.CreateBuilder<BoundStatement>();
+            _scope = new BoundScope(_scope);
+
+            foreach (var statementSyntax in syntax.Statement)
+            {
+                if (statementSyntax.Kind != SyntaxKind.VariableDeclaration)
+                {
+                    Diagnostics.ReportInvalidExpressionStatement(statementSyntax.Location);
+                }
+
+                var statement = BindVariableDeclaration((VariableDeclarationSyntax)statementSyntax);
+                statements.Add(statement);
+            }
+
+            return new BoundMemberBlockStatement(syntax, statements.ToImmutable());
         }
 
         private BoundStatement BindStatementInternal(StatementSyntax syntax)
@@ -335,12 +451,54 @@ namespace EV2.CodeAnalysis.Binding
         {
             var isReadOnly = syntax.Keyword.Kind == SyntaxKind.LetKeyword;
             var type = BindTypeClause(syntax.TypeClause);
-            var initializer = BindExpression(syntax.Initializer);
-            var variableType = type ?? initializer.Type;
-            var variable = BindVariableDeclaration(syntax.Identifier, isReadOnly, variableType, initializer.ConstantValue);
-            var convertedInitializer = BindConversion(syntax.Initializer.Location, initializer, variableType);
 
-            return new BoundVariableDeclaration(syntax, variable, convertedInitializer);
+            if (syntax.Initializer != null && syntax.Initializer.Kind != SyntaxKind.DefaultKeyword)
+            {
+                var initializer = BindExpression(syntax.Initializer);
+                var variableType = type ?? initializer.Type;
+                var variable = BindVariableDeclaration(syntax.Identifier, isReadOnly, variableType, initializer.ConstantValue);
+                var convertedInitializer = BindConversion(syntax.Initializer.Location, initializer, variableType);
+
+                return new BoundVariableDeclaration(syntax, variable, convertedInitializer);
+            }
+            else if (type != null)
+            {
+                var initializer = syntax.Initializer?.Kind == SyntaxKind.DefaultKeyword
+                    ? BindDefaultExpression((DefaultKeywordSyntax)syntax.Initializer, syntax.TypeClause)
+                    : BindSyntheticDefaultExpression(syntax, syntax.TypeClause);
+                var variableType = type;
+                var variable = BindVariableDeclaration(syntax.Identifier, isReadOnly, variableType);
+                var convertedInitializer = BindConversion(syntax.TypeClause.Location, initializer, variableType);
+
+                return new BoundVariableDeclaration(syntax, variable, convertedInitializer);
+            }
+            else
+            {
+                Diagnostics.ReportUndefinedType(syntax.TypeClause?.Location ?? syntax.Identifier.Location, syntax.TypeClause?.Identifier.Text ?? syntax.Identifier.Text);
+                return new BoundExpressionStatement(syntax, new BoundErrorExpression(syntax));
+            }
+        }
+
+        [return: NotNullIfNotNull("typeSyntax")]
+        private BoundLiteralExpression BindSyntheticDefaultExpression(VariableDeclarationSyntax syntax, TypeClauseSyntax? typeSyntax)
+        {
+            var syntaxToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.DefaultKeyword, syntax.Span.End, null, null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
+            var syntaxNode = new DefaultKeywordSyntax(syntax.SyntaxTree, syntaxToken);
+
+            return BindDefaultExpression(syntaxNode, typeSyntax);
+        }
+
+        [return: NotNullIfNotNull("typeSyntax")]
+        private BoundLiteralExpression? BindDefaultExpression(DefaultKeywordSyntax syntax, TypeClauseSyntax? typeSyntax)
+        {
+            if (typeSyntax == null)
+                return null;
+
+            var type = LookupType(typeSyntax.Identifier.Text);
+            if (type == null)
+                Diagnostics.ReportUndefinedType(typeSyntax.Identifier.Location, typeSyntax.Identifier.Text);
+
+            return new BoundLiteralExpression(syntax, type.DefaultValue);
         }
 
         [return: NotNullIfNotNull("syntax")]
@@ -351,7 +509,7 @@ namespace EV2.CodeAnalysis.Binding
 
             var type = LookupType(syntax.Identifier.Text);
             if (type == null)
-                _diagnostics.ReportUndefinedType(syntax.Identifier.Location, syntax.Identifier.Text);
+                Diagnostics.ReportUndefinedType(syntax.Identifier.Location, syntax.Identifier.Text);
 
             return type;
         }
@@ -363,9 +521,9 @@ namespace EV2.CodeAnalysis.Binding
             if (condition.ConstantValue != null)
             {
                 if ((bool)condition.ConstantValue.Value == false)
-                    _diagnostics.ReportUnreachableCode(syntax.ThenStatement);
+                    Diagnostics.ReportUnreachableCode(syntax.ThenStatement);
                 else if (syntax.ElseClause != null)
-                    _diagnostics.ReportUnreachableCode(syntax.ElseClause.ElseStatement);
+                    Diagnostics.ReportUnreachableCode(syntax.ElseClause.ElseStatement);
             }
 
             var thenStatement = BindStatement(syntax.ThenStatement);
@@ -381,7 +539,7 @@ namespace EV2.CodeAnalysis.Binding
             {
                 if (!(bool)condition.ConstantValue.Value)
                 {
-                    _diagnostics.ReportUnreachableCode(syntax.Body);
+                    Diagnostics.ReportUnreachableCode(syntax.Body);
                 }
             }
 
@@ -428,7 +586,7 @@ namespace EV2.CodeAnalysis.Binding
         {
             if (_loopStack.Count == 0)
             {
-                _diagnostics.ReportInvalidBreakOrContinue(syntax.Keyword.Location, syntax.Keyword.Text);
+                Diagnostics.ReportInvalidBreakOrContinue(syntax.Keyword.Location, syntax.Keyword.Text);
                 return BindErrorStatement(syntax);
             }
 
@@ -440,7 +598,7 @@ namespace EV2.CodeAnalysis.Binding
         {
             if (_loopStack.Count == 0)
             {
-                _diagnostics.ReportInvalidBreakOrContinue(syntax.Keyword.Location, syntax.Keyword.Text);
+                Diagnostics.ReportInvalidBreakOrContinue(syntax.Keyword.Location, syntax.Keyword.Text);
                 return BindErrorStatement(syntax);
             }
 
@@ -463,7 +621,7 @@ namespace EV2.CodeAnalysis.Binding
                 else if (expression != null)
                 {
                     // Main does not support return values.
-                    _diagnostics.ReportInvalidReturnWithValueInGlobalStatements(syntax.Expression!.Location);
+                    Diagnostics.ReportInvalidReturnWithValueInGlobalStatements(syntax.Expression!.Location);
                 }
             }
             else
@@ -471,12 +629,12 @@ namespace EV2.CodeAnalysis.Binding
                 if (_function.Type == TypeSymbol.Void)
                 {
                     if (expression != null)
-                        _diagnostics.ReportInvalidReturnExpression(syntax.Expression!.Location, _function.Name);
+                        Diagnostics.ReportInvalidReturnExpression(syntax.Expression!.Location, _function.Name);
                 }
                 else
                 {
                     if (expression == null)
-                        _diagnostics.ReportMissingReturnExpression(syntax.ReturnKeyword.Location, _function.Type);
+                        Diagnostics.ReportMissingReturnExpression(syntax.ReturnKeyword.Location, _function.Type);
                     else
                         expression = BindConversion(syntax.Expression!.Location, expression, _function.Type);
                 }
@@ -501,7 +659,7 @@ namespace EV2.CodeAnalysis.Binding
             var result = BindExpressionInternal(syntax);
             if (!canBeVoid && result.Type == TypeSymbol.Void)
             {
-                _diagnostics.ReportExpressionMustHaveValue(syntax.Location);
+                Diagnostics.ReportExpressionMustHaveValue(syntax.Location);
                 return new BoundErrorExpression(syntax);
             }
 
@@ -544,7 +702,6 @@ namespace EV2.CodeAnalysis.Binding
 
         private BoundExpression BindNameExpression(NameExpressionSyntax syntax)
         {
-            var name = syntax.IdentifierToken.Text;
             if (syntax.IdentifierToken.IsMissing)
             {
                 // This means the token was inserted by the parser. We already
@@ -553,6 +710,7 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             var variable = BindVariableReference(syntax.IdentifierToken);
+
             if (variable == null)
                 return new BoundErrorExpression(syntax);
 
@@ -565,11 +723,12 @@ namespace EV2.CodeAnalysis.Binding
             var boundExpression = BindExpression(syntax.Expression);
 
             var variable = BindVariableReference(syntax.IdentifierToken);
+
             if (variable == null)
                 return boundExpression;
 
             if (variable.IsReadOnly)
-                _diagnostics.ReportCannotAssign(syntax.AssignmentToken.Location, name);
+                Diagnostics.ReportCannotAssign(syntax.AssignmentToken.Location, name);
 
             if (syntax.AssignmentToken.Kind != SyntaxKind.EqualsToken)
             {
@@ -578,7 +737,7 @@ namespace EV2.CodeAnalysis.Binding
 
                 if (boundOperator == null)
                 {
-                    _diagnostics.ReportUndefinedBinaryOperator(syntax.AssignmentToken.Location, syntax.AssignmentToken.Text, variable.Type, boundExpression.Type);
+                    Diagnostics.ReportUndefinedBinaryOperator(syntax.AssignmentToken.Location, syntax.AssignmentToken.Text, variable.Type, boundExpression.Type);
                     return new BoundErrorExpression(syntax);
                 }
 
@@ -603,7 +762,7 @@ namespace EV2.CodeAnalysis.Binding
 
             if (boundOperator == null)
             {
-                _diagnostics.ReportUndefinedUnaryOperator(syntax.OperatorToken.Location, syntax.OperatorToken.Text, boundOperand.Type);
+                Diagnostics.ReportUndefinedUnaryOperator(syntax.OperatorToken.Location, syntax.OperatorToken.Text, boundOperand.Type);
                 return new BoundErrorExpression(syntax);
             }
 
@@ -622,7 +781,7 @@ namespace EV2.CodeAnalysis.Binding
 
             if (boundOperator == null)
             {
-                _diagnostics.ReportUndefinedBinaryOperator(syntax.OperatorToken.Location, syntax.OperatorToken.Text, boundLeft.Type, boundRight.Type);
+                Diagnostics.ReportUndefinedBinaryOperator(syntax.OperatorToken.Location, syntax.OperatorToken.Text, boundLeft.Type, boundRight.Type);
                 return new BoundErrorExpression(syntax);
             }
 
@@ -631,8 +790,12 @@ namespace EV2.CodeAnalysis.Binding
 
         private BoundExpression BindCallExpression(CallExpressionSyntax syntax)
         {
-            if (syntax.Arguments.Count == 1 && LookupType(syntax.Identifier.Text) is TypeSymbol type)
-                return BindConversion(syntax.Arguments[0], type, allowExplicit: true);
+            // All built-in basic types have a conversion function with the same name that accepts one
+            // parameter.
+            var type = LookupType(syntax.Identifier.Text);
+
+            if (syntax.Arguments.Count == 1 && !(type is StructSymbol) && type is TypeSymbol t)
+                return BindConversion(syntax.Arguments[0], t, allowExplicit: true);
 
             var boundArguments = ImmutableArray.CreateBuilder<BoundExpression>();
 
@@ -643,16 +806,21 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             var symbol = _scope.TryLookupSymbol(syntax.Identifier.Text);
+
+            if (symbol is StructSymbol)
+            {
+                symbol = _scope.TryLookupSymbol(syntax.Identifier.Text + ".ctor");
+            }
+
             if (symbol == null)
             {
-                _diagnostics.ReportUndefinedFunction(syntax.Identifier.Location, syntax.Identifier.Text);
+                Diagnostics.ReportUndefinedFunction(syntax.Identifier.Location, syntax.Identifier.Text);
                 return new BoundErrorExpression(syntax);
             }
 
-            var function = symbol as FunctionSymbol;
-            if (function == null)
+            if (!(symbol is FunctionSymbol function))
             {
-                _diagnostics.ReportNotAFunction(syntax.Identifier.Location, syntax.Identifier.Text);
+                Diagnostics.ReportNotAFunction(syntax.Identifier.Location, syntax.Identifier.Text);
                 return new BoundErrorExpression(syntax);
             }
 
@@ -673,8 +841,10 @@ namespace EV2.CodeAnalysis.Binding
                 {
                     span = syntax.CloseParenthesisToken.Span;
                 }
+
                 var location = new TextLocation(syntax.SyntaxTree.Text, span);
-                _diagnostics.ReportWrongArgumentCount(location, function.Name, function.Parameters.Length, syntax.Arguments.Count);
+                Diagnostics.ReportWrongArgumentCount(location, syntax.Identifier.Text, function.Parameters.Length, syntax.Arguments.Count);
+
                 return new BoundErrorExpression(syntax);
             }
 
@@ -702,14 +872,14 @@ namespace EV2.CodeAnalysis.Binding
             if (!conversion.Exists)
             {
                 if (expression.Type != TypeSymbol.Error && type != TypeSymbol.Error)
-                    _diagnostics.ReportCannotConvert(diagnosticLocation, expression.Type, type);
+                    Diagnostics.ReportCannotConvert(diagnosticLocation, expression.Type, type);
 
                 return new BoundErrorExpression(expression.Syntax);
             }
 
             if (!allowExplicit && conversion.IsExplicit)
             {
-                _diagnostics.ReportCannotConvertImplicitly(diagnosticLocation, expression.Type, type);
+                Diagnostics.ReportCannotConvertImplicitly(diagnosticLocation, expression.Type, type);
             }
 
             if (conversion.IsIdentity)
@@ -727,7 +897,7 @@ namespace EV2.CodeAnalysis.Binding
                                 : new LocalVariableSymbol(name, isReadOnly, type, constant);
 
             if (declare && !_scope.TryDeclareVariable(variable))
-                _diagnostics.ReportSymbolAlreadyDeclared(identifier.Location, name);
+                Diagnostics.ReportSymbolAlreadyDeclared(identifier.Location, name);
 
             return variable;
         }
@@ -735,17 +905,18 @@ namespace EV2.CodeAnalysis.Binding
         private VariableSymbol? BindVariableReference(SyntaxToken identifierToken)
         {
             var name = identifierToken.Text;
+
             switch (_scope.TryLookupSymbol(name))
             {
                 case VariableSymbol variable:
                     return variable;
 
                 case null:
-                    _diagnostics.ReportUndefinedVariable(identifierToken.Location, name);
+                    Diagnostics.ReportUndefinedVariable(identifierToken.Location, name);
                     return null;
 
                 default:
-                    _diagnostics.ReportNotAVariable(identifierToken.Location, name);
+                    Diagnostics.ReportNotAVariable(identifierToken.Location, name);
                     return null;
             }
         }
@@ -763,6 +934,10 @@ namespace EV2.CodeAnalysis.Binding
                 case "string":
                     return TypeSymbol.String;
                 default:
+                    var maybeSymbol = _scope.TryLookupSymbol(name);
+
+                    if (maybeSymbol is TypeSymbol s) return s;
+
                     return null;
             }
         }

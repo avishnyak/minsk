@@ -7,5 +7,6 @@ namespace EV2.CodeAnalysis.Symbols
         LocalVariable,
         Parameter,
         Type,
+        Struct,
     }
 }

@@ -4,6 +4,7 @@ namespace EV2.CodeAnalysis.Binding
     {
         // Statements
         BlockStatement,
+        MemberBlockStatement,
         NopStatement,
         VariableDeclaration,
         IfStatement,

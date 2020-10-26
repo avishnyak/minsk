@@ -184,6 +184,12 @@ namespace EV2.CodeAnalysis
             ReportError(location, message);
         }
 
+        public void ReportInvalidAssignmentExpressionStatement(TextLocation location)
+        {
+            var message = $"Only field declarations and assignment expressions are allowed in structs.";
+            ReportError(location, message);
+        }
+
         public void ReportOnlyOneFileCanHaveGlobalStatements(TextLocation location)
         {
             var message = $"At most one file can have global statements.";

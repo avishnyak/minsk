@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using EV2.CodeAnalysis.Syntax;
 
 namespace EV2.CodeAnalysis.Binding
 {
@@ -11,6 +12,8 @@ namespace EV2.CodeAnalysis.Binding
             {
                 case BoundNodeKind.BlockStatement:
                     return RewriteBlockStatement((BoundBlockStatement)node);
+                case BoundNodeKind.MemberBlockStatement:
+                    return RewriteBlockStatement((BoundMemberBlockStatement)node);
                 case BoundNodeKind.NopStatement:
                     return RewriteNopStatement((BoundNopStatement)node);
                 case BoundNodeKind.VariableDeclaration:
@@ -40,22 +43,30 @@ namespace EV2.CodeAnalysis.Binding
             }
         }
 
-        protected virtual BoundStatement RewriteBlockStatement(BoundBlockStatement node)
+
+        protected virtual BoundStatement RewriteBlockStatement(BoundStatement node)
         {
             ImmutableArray<BoundStatement>.Builder? builder = null;
 
-            for (var i = 0; i< node.Statements.Length; i++)
+            var boundStatements = node switch
             {
-                var oldStatement = node.Statements[i];
+                BoundBlockStatement bbs => bbs.Statements,
+                BoundMemberBlockStatement bmbs => bmbs.Statements,
+                _ => throw new Exception($"Unexpected block statement type '{node.Kind}'."),
+            };
+
+            for (var i = 0; i < boundStatements.Length; i++)
+            {
+                var oldStatement = boundStatements[i];
                 var newStatement = RewriteStatement(oldStatement);
                 if (newStatement != oldStatement)
                 {
                     if (builder == null)
                     {
-                        builder = ImmutableArray.CreateBuilder<BoundStatement>(node.Statements.Length);
+                        builder = ImmutableArray.CreateBuilder<BoundStatement>(boundStatements.Length);
 
                         for (var j = 0; j < i; j++)
-                            builder.Add(node.Statements[j]);
+                            builder.Add(boundStatements[j]);
                     }
                 }
 
@@ -119,6 +130,7 @@ namespace EV2.CodeAnalysis.Binding
             var lowerBound = RewriteExpression(node.LowerBound);
             var upperBound = RewriteExpression(node.UpperBound);
             var body = RewriteStatement(node.Body);
+
             if (lowerBound == node.LowerBound && upperBound == node.UpperBound && body == node.Body)
                 return node;
 
@@ -138,6 +150,7 @@ namespace EV2.CodeAnalysis.Binding
         protected virtual BoundStatement RewriteConditionalGotoStatement(BoundConditionalGotoStatement node)
         {
             var condition = RewriteExpression(node.Condition);
+
             if (condition == node.Condition)
                 return node;
 
@@ -147,6 +160,7 @@ namespace EV2.CodeAnalysis.Binding
         protected virtual BoundStatement RewriteReturnStatement(BoundReturnStatement node)
         {
             var expression = node.Expression == null ? null : RewriteExpression(node.Expression);
+
             if (expression == node.Expression)
                 return node;
 
@@ -156,6 +170,7 @@ namespace EV2.CodeAnalysis.Binding
         protected virtual BoundStatement RewriteExpressionStatement(BoundExpressionStatement node)
         {
             var expression = RewriteExpression(node.Expression);
+
             if (expression == node.Expression)
                 return node;
 
@@ -165,6 +180,7 @@ namespace EV2.CodeAnalysis.Binding
         private BoundStatement RewriteSequencePointStatement(BoundSequencePointStatement node)
         {
             var statement = RewriteStatement(node.Statement);
+
             if (statement == node.Statement)
                 return node;
 
@@ -216,6 +232,7 @@ namespace EV2.CodeAnalysis.Binding
         protected virtual BoundExpression RewriteAssignmentExpression(BoundAssignmentExpression node)
         {
             var expression = RewriteExpression(node.Expression);
+
             if (expression == node.Expression)
                 return node;
 
@@ -225,6 +242,7 @@ namespace EV2.CodeAnalysis.Binding
         protected virtual BoundExpression RewriteCompoundAssignmentExpression(BoundCompoundAssignmentExpression node)
         {
             var expression = RewriteExpression(node.Expression);
+
             if (expression == node.Expression)
                 return node;
 
@@ -234,6 +252,7 @@ namespace EV2.CodeAnalysis.Binding
         protected virtual BoundExpression RewriteUnaryExpression(BoundUnaryExpression node)
         {
             var operand = RewriteExpression(node.Operand);
+
             if (operand == node.Operand)
                 return node;
 
@@ -244,6 +263,7 @@ namespace EV2.CodeAnalysis.Binding
         {
             var left = RewriteExpression(node.Left);
             var right = RewriteExpression(node.Right);
+
             if (left == node.Left && right == node.Right)
                 return node;
 
@@ -258,6 +278,7 @@ namespace EV2.CodeAnalysis.Binding
             {
                 var oldArgument = node.Arguments[i];
                 var newArgument = RewriteExpression(oldArgument);
+
                 if (newArgument != oldArgument)
                 {
                     if (builder == null)
@@ -282,6 +303,7 @@ namespace EV2.CodeAnalysis.Binding
         protected virtual BoundExpression RewriteConversionExpression(BoundConversionExpression node)
         {
             var expression = RewriteExpression(node.Expression);
+
             if (expression == node.Expression)
                 return node;
 
