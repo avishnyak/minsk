@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using EV2.CodeAnalysis.Binding;
@@ -15,24 +13,16 @@ namespace EV2.CodeAnalysis
     {
         private BoundGlobalScope? _globalScope;
 
-        private Compilation(bool isScript, Compilation? previous, params SyntaxTree[] syntaxTrees)
+        private Compilation(params SyntaxTree[] syntaxTrees)
         {
-            IsScript = isScript;
-            Previous = previous;
             SyntaxTrees = syntaxTrees.ToImmutableArray();
         }
 
         public static Compilation Create(params SyntaxTree[] syntaxTrees)
         {
-            return new Compilation(isScript: false, previous: null, syntaxTrees);
+            return new Compilation(syntaxTrees);
         }
 
-        public static Compilation CreateScript(Compilation? previous, params SyntaxTree[] syntaxTrees)
-        {
-            return new Compilation(isScript: true, previous, syntaxTrees);
-        }
-
-        public bool IsScript { get; }
         public Compilation? Previous { get; }
         public ImmutableArray<SyntaxTree> SyntaxTrees { get; }
         public FunctionSymbol? MainFunction => GlobalScope.MainFunction;
@@ -45,7 +35,7 @@ namespace EV2.CodeAnalysis
             {
                 if (_globalScope == null)
                 {
-                    var globalScope = Binder.BindGlobalScope(IsScript, Previous?.GlobalScope, SyntaxTrees);
+                    var globalScope = Binder.BindGlobalScope(Previous?.GlobalScope, SyntaxTrees);
                     Interlocked.CompareExchange(ref _globalScope, globalScope, null);
                 }
 
@@ -81,57 +71,13 @@ namespace EV2.CodeAnalysis
         private BoundProgram GetProgram()
         {
             var previous = Previous?.GetProgram();
-            return Binder.BindProgram(IsScript, previous, GlobalScope);
+            return Binder.BindProgram(previous, GlobalScope);
         }
 
         public ImmutableArray<Diagnostic> Validate()
         {
             var program = GetProgram();
             return program.Diagnostics;
-        }
-
-        public EvaluationResult Evaluate(Dictionary<VariableSymbol, object> variables)
-        {
-            if (GlobalScope.Diagnostics.Any())
-                return new EvaluationResult(GlobalScope.Diagnostics, null);
-
-            var program = GetProgram();
-
-            // var appPath = Environment.GetCommandLineArgs()[0];
-            // var appDirectory = Path.GetDirectoryName(appPath);
-            // var cfgPath = Path.Combine(appDirectory, "cfg.dot");
-            // var cfgStatement = !program.Statement.Statements.Any() && program.Functions.Any()
-            //                       ? program.Functions.Last().Value
-            //                       : program.Statement;
-            // var cfg = ControlFlowGraph.Create(cfgStatement);
-            // using (var streamWriter = new StreamWriter(cfgPath))
-            //     cfg.WriteTo(streamWriter);
-
-            if (program.Diagnostics.HasErrors())
-                return new EvaluationResult(program.Diagnostics, null);
-
-            var evaluator = new Evaluator(program, variables);
-            var value = evaluator.Evaluate();
-
-            return new EvaluationResult(program.Diagnostics, value);
-        }
-
-        public void EmitTree(TextWriter writer)
-        {
-            if (GlobalScope.MainFunction != null)
-                EmitTree(GlobalScope.MainFunction, writer);
-            else if (GlobalScope.ScriptFunction != null)
-                EmitTree(GlobalScope.ScriptFunction, writer);
-        }
-
-        public void EmitTree(FunctionSymbol symbol, TextWriter writer)
-        {
-            var program = GetProgram();
-            symbol.WriteTo(writer);
-            writer.WriteLine();
-            if (!program.Functions.TryGetValue(symbol, out var body))
-                return;
-            body.WriteTo(writer);
         }
 
         // TODO: References should be part of the compilation, not arguments for Emit

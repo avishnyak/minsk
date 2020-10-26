@@ -1,4 +1,5 @@
-﻿Microsoft Visual Studio Solution File, Format Version 12.00
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30011.22
 MinimumVisualStudioVersion = 15.0.26124.0
@@ -10,11 +11,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EV2.Tests", "EV2.Tests\EV2.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ev2c", "ev2c\ev2c.csproj", "{016A06A3-0FED-42BE-99CA-74FDE1D0D03D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ev2i", "ev2i\ev2i.csproj", "{9C7AFA59-BB65-46AB-A14B-30F601CBDC8C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EV2.Host", "EV2.Host\EV2.Host.csproj", "{882663CC-F5C7-4055-8574-47E3B8296560}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EV2.Host", "EV2.Host\EV2.Host.csproj", "{882663CC-F5C7-4055-8574-47E3B8296560}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EV2.EV2LanguageServer", "EV2.EV2LanguageServer\EV2.EV2LanguageServer.csproj", "{1A7E5AFF-23A4-49BA-9626-E29181171C36}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EV2.EV2LanguageServer", "EV2.EV2LanguageServer\EV2.EV2LanguageServer.csproj", "{1A7E5AFF-23A4-49BA-9626-E29181171C36}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,10 +37,6 @@ Global
 		{016A06A3-0FED-42BE-99CA-74FDE1D0D03D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{016A06A3-0FED-42BE-99CA-74FDE1D0D03D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{016A06A3-0FED-42BE-99CA-74FDE1D0D03D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9C7AFA59-BB65-46AB-A14B-30F601CBDC8C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9C7AFA59-BB65-46AB-A14B-30F601CBDC8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9C7AFA59-BB65-46AB-A14B-30F601CBDC8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9C7AFA59-BB65-46AB-A14B-30F601CBDC8C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{882663CC-F5C7-4055-8574-47E3B8296560}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{882663CC-F5C7-4055-8574-47E3B8296560}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{882663CC-F5C7-4055-8574-47E3B8296560}.Release|Any CPU.ActiveCfg = Release|Any CPU

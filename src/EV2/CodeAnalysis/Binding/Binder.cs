@@ -12,17 +12,15 @@ namespace EV2.CodeAnalysis.Binding
 {
     internal sealed class Binder
     {
-        private readonly bool _isScript;
         private readonly FunctionSymbol? _function;
 
         private Stack<(BoundLabel BreakLabel, BoundLabel ContinueLabel)> _loopStack = new Stack<(BoundLabel BreakLabel, BoundLabel ContinueLabel)>();
         private int _labelCounter;
         private BoundScope _scope;
 
-        private Binder(bool isScript, BoundScope? parent, FunctionSymbol? function)
+        private Binder(BoundScope? parent, FunctionSymbol? function)
         {
             _scope = new BoundScope(parent);
-            _isScript = isScript;
             _function = function;
 
             if (function != null)
@@ -32,10 +30,10 @@ namespace EV2.CodeAnalysis.Binding
             }
         }
 
-        public static BoundGlobalScope BindGlobalScope(bool isScript, BoundGlobalScope? previous, ImmutableArray<SyntaxTree> syntaxTrees)
+        public static BoundGlobalScope BindGlobalScope(BoundGlobalScope? previous, ImmutableArray<SyntaxTree> syntaxTrees)
         {
             var parentScope = CreateParentScope(previous);
-            var binder = new Binder(isScript, parentScope, function: null);
+            var binder = new Binder(parentScope, function: null);
 
             binder.Diagnostics.AddRange(syntaxTrees.SelectMany(st => st.Diagnostics));
 
@@ -94,42 +92,27 @@ namespace EV2.CodeAnalysis.Binding
             FunctionSymbol? mainFunction;
             FunctionSymbol? scriptFunction;
 
-            if (isScript)
+            mainFunction = functions.FirstOrDefault(f => f.Name == "main");
+            scriptFunction = null;
+
+            if (mainFunction != null)
             {
-                mainFunction = null;
-                if (globalStatements.Any())
+                if (mainFunction.Type != TypeSymbol.Void || mainFunction.Parameters.Any())
+                    binder.Diagnostics.ReportMainMustHaveCorrectSignature(mainFunction.Declaration!.Identifier.Location);
+            }
+
+            if (globalStatements.Any())
+            {
+                if (mainFunction != null)
                 {
-                    scriptFunction = new FunctionSymbol("$eval", ImmutableArray<ParameterSymbol>.Empty, TypeSymbol.Any, null);
+                    binder.Diagnostics.ReportCannotMixMainAndGlobalStatements(mainFunction.Declaration!.Identifier.Location);
+
+                    foreach (var globalStatement in firstGlobalStatementPerSyntaxTree)
+                        binder.Diagnostics.ReportCannotMixMainAndGlobalStatements(globalStatement.Location);
                 }
                 else
                 {
-                    scriptFunction = null;
-                }
-            }
-            else
-            {
-                mainFunction = functions.FirstOrDefault(f => f.Name == "main");
-                scriptFunction = null;
-
-                if (mainFunction != null)
-                {
-                    if (mainFunction.Type != TypeSymbol.Void || mainFunction.Parameters.Any())
-                        binder.Diagnostics.ReportMainMustHaveCorrectSignature(mainFunction.Declaration!.Identifier.Location);
-                }
-
-                if (globalStatements.Any())
-                {
-                    if (mainFunction != null)
-                    {
-                        binder.Diagnostics.ReportCannotMixMainAndGlobalStatements(mainFunction.Declaration!.Identifier.Location);
-
-                        foreach (var globalStatement in firstGlobalStatementPerSyntaxTree)
-                            binder.Diagnostics.ReportCannotMixMainAndGlobalStatements(globalStatement.Location);
-                    }
-                    else
-                    {
-                        mainFunction = new FunctionSymbol("main", ImmutableArray<ParameterSymbol>.Empty, TypeSymbol.Void, null);
-                    }
+                    mainFunction = new FunctionSymbol("main", ImmutableArray<ParameterSymbol>.Empty, TypeSymbol.Void, null);
                 }
             }
 
@@ -143,7 +126,7 @@ namespace EV2.CodeAnalysis.Binding
             return new BoundGlobalScope(previous, diagnostics, mainFunction, scriptFunction, structs, functions, variables, statements.ToImmutable());
         }
 
-        public static BoundProgram BindProgram(bool isScript, BoundProgram? previous, BoundGlobalScope globalScope)
+        public static BoundProgram BindProgram(BoundProgram? previous, BoundGlobalScope globalScope)
         {
             var parentScope = CreateParentScope(globalScope);
 
@@ -162,7 +145,7 @@ namespace EV2.CodeAnalysis.Binding
 
             foreach (var @struct in globalScope.Structs)
             {
-                var binder = new Binder(isScript, parentScope, null);
+                var binder = new Binder(parentScope, null);
                 var body = binder.BindMemberBlockStatement(@struct.Declaration!.Body);
                 var loweredBody = Lowerer.Lower(@struct, body);
 
@@ -179,7 +162,7 @@ namespace EV2.CodeAnalysis.Binding
                 // the user for code they never wrote.
                 if (function.Type is StructSymbol) { continue;  }
 
-                var binder = new Binder(isScript, parentScope, function);
+                var binder = new Binder(parentScope, function);
                 var body = binder.BindStatement(function.Declaration!.Body);
                 var loweredBody = Lowerer.Lower(function, body);
 
@@ -366,7 +349,7 @@ namespace EV2.CodeAnalysis.Binding
         {
             var result = BindStatementInternal(syntax);
 
-            if (!_isScript || !isGlobal)
+            if (!isGlobal)
             {
                 if (result is BoundExpressionStatement es)
                 {
@@ -612,13 +595,7 @@ namespace EV2.CodeAnalysis.Binding
 
             if (_function == null)
             {
-                if (_isScript)
-                {
-                    // Ignore because we allow both return with and without values.
-                    if (expression == null)
-                        expression = new BoundLiteralExpression(syntax, "");
-                }
-                else if (expression != null)
+                if (expression != null)
                 {
                     // Main does not support return values.
                     Diagnostics.ReportInvalidReturnWithValueInGlobalStatements(syntax.Expression!.Location);

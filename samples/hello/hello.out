@@ -1,16 +1,73 @@
 Hello world!
+Variable types
 Hello
 123
 False
+Variables with implied types
 Hello
 123
 False
+Variables with implied defaults
 
 0
 False
+Variables with explicit defaults
 
 0
 False
+Variables that cannot be re-assigned (ie. constants)
 Const Hello
 321
 False
+Basic expressions
++1 == 1: True
+-1 == -1: True
+~1 == -2: True
+14 + 12 == 26: True
+12 - 3 == 9: True
+4 * 2 == 8: True
+9 / 3 == 3: True
+(10) == 10: 10
+12 == 3 is false: False
+3 == 3 is true: True
+12 != 3 is true: True
+3 != 3 is false: False
+3 < 4 is true: True
+5 < 4: False
+4 <= 4: True
+4 <= 5: True
+5 <= 4: False
+4 > 3: True
+4 > 5: False
+4 >= 4: True
+5 >= 4: True
+4 >= 5: False
+1 | 2: 3
+1 | 0: 1
+1 & 3: 1
+1 & 0: 0
+1 ^ 0: 1
+0 ^ 1: 1
+1 ^ 3: 2
+false == false: True
+true == false: False
+false != false: False
+true != false: True
+true && true: True
+false || false: False
+false | false: False
+false | true: True
+true | false: True
+true | true: True
+false & false: False
+false & true: False
+true & false: False
+true & true: True
+false ^ false: False
+true ^ false: True
+false ^ true: True
+true ^ true: False
+true: True
+false: False
+!true: False
+!false: True
