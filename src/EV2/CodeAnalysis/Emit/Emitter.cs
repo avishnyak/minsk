@@ -246,6 +246,31 @@ namespace EV2.CodeAnalysis.Emit
             _assemblyDefinition.MainModule.Types.Add(classType);
             _structs.Add(key, classType);
             _knownTypes.Add(key, classType);
+
+            // Forward-declare empty constructor
+            var emptyCtorDefinition = new MethodDefinition(
+                ".ctor",
+                MethodAttributes.Public |
+                MethodAttributes.SpecialName |
+                MethodAttributes.RTSpecialName |
+                MethodAttributes.HideBySig,
+                _knownTypes[TypeSymbol.Void]
+            );
+
+            classType.Methods.Insert(0, emptyCtorDefinition);
+
+            // Forward-declare initializer constructor
+            var defaultCtorDefintion = new MethodDefinition(
+                ".ctor",
+                MethodAttributes.Public |
+                MethodAttributes.SpecialName |
+                MethodAttributes.RTSpecialName |
+                MethodAttributes.HideBySig,
+                _knownTypes[TypeSymbol.Void]
+            );
+
+            // This constructor will be the second one on the class
+            classType.Methods.Insert(1, defaultCtorDefintion);
         }
 
         private void EmitStructBody(StructSymbol key, BoundBlockStatement value)
@@ -259,17 +284,7 @@ namespace EV2.CodeAnalysis.Emit
         private void EmitEmptyConstructorForStruct(BoundBlockStatement value, TypeDefinition structType)
         {
             // Create empty constructor
-            var constructor = new MethodDefinition(
-                ".ctor",
-                MethodAttributes.Public |
-                MethodAttributes.SpecialName |
-                MethodAttributes.RTSpecialName |
-                MethodAttributes.HideBySig,
-                _knownTypes[TypeSymbol.Void]
-            );
-
-            structType.Methods.Insert(0, constructor);
-
+            var constructor = structType.Methods[0];
             var ilProcessor = constructor.Body.GetILProcessor();
 
             foreach (var field in value.Statements)
@@ -289,7 +304,7 @@ namespace EV2.CodeAnalysis.Emit
                     structType.Fields.Add(fieldDefinition);
 
                     EmitSequencePointStatement(ilProcessor, s);
-                    EmitFieldAssignment(ilProcessor, sd, fieldDefinition);
+                    // EmitFieldAssignment(ilProcessor, sd, fieldDefinition);
                 }
                 else
                 {
@@ -307,18 +322,7 @@ namespace EV2.CodeAnalysis.Emit
         private void EmitDefaultConstructorForStruct(StructSymbol @struct, BoundBlockStatement value, TypeDefinition structType)
         {
             // Create empty constructor
-            var constructor = new MethodDefinition(
-                ".ctor",
-                MethodAttributes.Public |
-                MethodAttributes.SpecialName |
-                MethodAttributes.RTSpecialName |
-                MethodAttributes.HideBySig,
-                _knownTypes[TypeSymbol.Void]
-            );
-
-            // This constructor will be the second one on the class
-            structType.Methods.Insert(1, constructor);
-
+            var constructor = structType.Methods[1];
             var ilProcessor = constructor.Body.GetILProcessor();
 
             // Call base .ctor(), which sould in turn call the object.ctor()
@@ -557,8 +561,30 @@ namespace EV2.CodeAnalysis.Emit
                 case BoundNodeKind.ConversionExpression:
                     EmitConversionExpression(ilProcessor, (BoundConversionExpression)node);
                     break;
+                case BoundNodeKind.FieldAccessExpression:
+                    EmitFieldAccessExpression(ilProcessor, (BoundFieldAccessExpression)node);
+                    break;
                 default:
                     throw new Exception($"Unexpected node kind {node.Kind}");
+            }
+        }
+
+        private void EmitFieldAccessExpression(ILProcessor ilProcessor, BoundFieldAccessExpression node)
+        {
+            EmitExpression(ilProcessor, node.StructInstance);
+
+            var structSymbol = node.StructInstance.Type as StructSymbol;
+
+            Debug.Assert(structSymbol != null);
+
+            var @struct = _structs[structSymbol];
+
+            foreach (var field in @struct.Fields)
+            {
+                if (field.Name == node.StructMember.Name)
+                {
+                    ilProcessor.Emit(OpCodes.Ldfld, field);
+                }
             }
         }
 
@@ -850,8 +876,6 @@ namespace EV2.CodeAnalysis.Emit
 
         private void EmitCallExpression(ILProcessor ilProcessor, BoundCallExpression node)
         {
-            // Debugger.Launch();
-
             if (node.Function == BuiltinFunctions.Rnd)
             {
                 if (_randomFieldDefinition == null)
@@ -881,7 +905,9 @@ namespace EV2.CodeAnalysis.Emit
             {
                 var className = node.Function.Name[..^5];
                 var @struct = _structs.First(s => s.Key.Name == className).Value;
-                ilProcessor.Emit(OpCodes.Newobj, @struct.Methods[1]);
+
+                // TODO: Use a general overload resolution algorithm instead
+                ilProcessor.Emit(OpCodes.Newobj, node.Arguments.Length == 0 ? @struct.Methods[0] : @struct.Methods[1]);
             }
             else
             {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using EV2.CodeAnalysis.Lowering;
@@ -214,13 +215,24 @@ namespace EV2.CodeAnalysis.Binding
         private void BindStructDeclaration(StructDeclarationSyntax syntax)
         {
             // Peek into the struct body and generate a constructor based on all writeable members
-            var members = syntax.Body.Statement.OfType<VariableDeclarationSyntax>()
-                                               .Where(m => m.Keyword.Kind == SyntaxKind.VarKeyword);
+            var members = syntax.Body.Statement.OfType<VariableDeclarationSyntax>();
 
             var ctorParameters = ImmutableArray.CreateBuilder<ParameterSymbol>();
+            var boundMembers = ImmutableArray.CreateBuilder<VariableSymbol>();
 
             foreach (var varDeclarationSyntax in members)
             {
+                var decl = BindVariableDeclaration(varDeclarationSyntax);
+
+                if (decl is BoundVariableDeclaration d)
+                    boundMembers.Add(d.Variable);
+
+                if (varDeclarationSyntax.Keyword.Kind == SyntaxKind.LetKeyword)
+                {
+                    // These are not candidates for ctorParameters because they are read-only
+                    continue;
+                }
+
                 var parameterName = varDeclarationSyntax.Identifier.Text;
                 var parameterType = BindTypeClause(varDeclarationSyntax.TypeClause);
 
@@ -228,7 +240,7 @@ namespace EV2.CodeAnalysis.Binding
                 {
                     parameterType = BindExpression(varDeclarationSyntax.Initializer).Type;
                 }
-                else
+                else if (parameterType == null && varDeclarationSyntax.Initializer == null)
                 {
                     // We don't need to do error reporting here (e.g. report on duplicate members) because that will be
                     // done later in the BindMemberBlockStatement
@@ -241,19 +253,20 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             string structIdentifier = syntax.Identifier.Text;
-            var @struct = new StructSymbol(structIdentifier, ctorParameters.ToImmutable(), syntax);
+            var @struct = new StructSymbol(structIdentifier, ctorParameters.ToImmutable(), boundMembers.ToImmutable(), syntax);
 
             if (structIdentifier != null && !_scope.TryDeclareStruct(@struct))
             {
                 Diagnostics.ReportSymbolAlreadyDeclared(syntax.Identifier.Location, @struct.Name);
             }
 
-            // Declare Built-in Constructor
-            var function = new FunctionSymbol(structIdentifier + ".ctor", ctorParameters.ToImmutable(), @struct);
+            // Declare Built-in Constructors
+            var ctor = new FunctionSymbol(structIdentifier + ".ctor", ImmutableArray<ParameterSymbol>.Empty, @struct);
+            var ctorWithParams = new FunctionSymbol(structIdentifier + ".ctor", ctorParameters.ToImmutable(), @struct, overloadFor: ctor);
 
-            if (structIdentifier != null && !_scope.TryDeclareFunction(function))
+            if (structIdentifier != null && !_scope.TryDeclareFunction(ctorWithParams))
             {
-                Diagnostics.ReportSymbolAlreadyDeclared(syntax.Identifier.Location, function.Name);
+                Diagnostics.ReportSymbolAlreadyDeclared(syntax.Identifier.Location, ctor.Name);
             }
         }
 
@@ -463,7 +476,7 @@ namespace EV2.CodeAnalysis.Binding
         }
 
         [return: NotNullIfNotNull("typeSyntax")]
-        private BoundLiteralExpression BindSyntheticDefaultExpression(VariableDeclarationSyntax syntax, TypeClauseSyntax? typeSyntax)
+        private BoundExpression? BindSyntheticDefaultExpression(VariableDeclarationSyntax syntax, TypeClauseSyntax? typeSyntax)
         {
             var syntaxToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.DefaultKeyword, syntax.Span.End, null, null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
             var syntaxNode = new DefaultKeywordSyntax(syntax.SyntaxTree, syntaxToken);
@@ -472,14 +485,25 @@ namespace EV2.CodeAnalysis.Binding
         }
 
         [return: NotNullIfNotNull("typeSyntax")]
-        private BoundLiteralExpression? BindDefaultExpression(DefaultKeywordSyntax syntax, TypeClauseSyntax? typeSyntax)
+        private BoundExpression? BindDefaultExpression(DefaultKeywordSyntax syntax, TypeClauseSyntax? typeSyntax)
         {
             if (typeSyntax == null)
                 return null;
 
             var type = LookupType(typeSyntax.Identifier.Text);
+
             if (type == null)
                 Diagnostics.ReportUndefinedType(typeSyntax.Identifier.Location, typeSyntax.Identifier.Text);
+
+            if (type is StructSymbol s)
+            {
+                // Struct types default to calling their empty constructor
+                var ctorSyntaxToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.IdentifierToken, syntax.Span.End, s.Name, null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
+                var openParenToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.OpenParenthesisToken, syntax.Span.End, "(", null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
+                var closeParenToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.CloseParenthesisToken, syntax.Span.End, ")", null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
+
+                return BindCallExpression(new CallExpressionSyntax(syntax.SyntaxTree, ctorSyntaxToken, openParenToken, new SeparatedSyntaxList<ExpressionSyntax>(ImmutableArray<SyntaxNode>.Empty), closeParenToken));
+            }
 
             return new BoundLiteralExpression(syntax, type.DefaultValue);
         }
@@ -661,6 +685,8 @@ namespace EV2.CodeAnalysis.Binding
                     return BindBinaryExpression((BinaryExpressionSyntax)syntax);
                 case SyntaxKind.CallExpression:
                     return BindCallExpression((CallExpressionSyntax)syntax);
+                case SyntaxKind.MemberAccessExpression:
+                    return BindMemberAccessExpression((MemberAccessExpressionSyntax)syntax);
                 default:
                     throw new Exception($"Unexpected syntax {syntax.Kind}");
             }
@@ -784,24 +810,26 @@ namespace EV2.CodeAnalysis.Binding
 
             var symbol = _scope.TryLookupSymbol(syntax.Identifier.Text);
 
-            if (symbol is StructSymbol)
-            {
-                symbol = _scope.TryLookupSymbol(syntax.Identifier.Text + ".ctor");
-            }
-
             if (symbol == null)
             {
                 Diagnostics.ReportUndefinedFunction(syntax.Identifier.Location, syntax.Identifier.Text);
                 return new BoundErrorExpression(syntax);
             }
 
-            if (!(symbol is FunctionSymbol function))
+            if (symbol is StructSymbol)
+            {
+                symbol = _scope.TryLookupSymbol(syntax.Identifier.Text + ".ctor");
+            }
+
+            if (!(symbol is FunctionSymbol))
             {
                 Diagnostics.ReportNotAFunction(syntax.Identifier.Location, syntax.Identifier.Text);
                 return new BoundErrorExpression(syntax);
             }
 
-            if (syntax.Arguments.Count != function.Parameters.Length)
+            FunctionSymbol? function = (FunctionSymbol)symbol;
+
+            if (function.OverloadFor == null && syntax.Arguments.Count != function.Parameters.Length)
             {
                 TextSpan span;
                 if (syntax.Arguments.Count > function.Parameters.Length)
@@ -824,6 +852,27 @@ namespace EV2.CodeAnalysis.Binding
 
                 return new BoundErrorExpression(syntax);
             }
+            else if (function.OverloadFor != null)
+            {
+                // Find best overload
+                while (function != null)
+                {
+                    if (syntax.Arguments.Count != function.Parameters.Length || !MatchArgumentsAndParameters(boundArguments.ToImmutable(), function.Parameters))
+                    {
+                        function = function.OverloadFor;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (function == null)
+                {
+                    Diagnostics.ReportUndefinedFunction(syntax.Identifier.Location, syntax.Identifier.Text);
+                    return new BoundErrorExpression(syntax);
+                }
+            }
 
             for (var i = 0; i < syntax.Arguments.Count; i++)
             {
@@ -834,6 +883,68 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             return new BoundCallExpression(syntax, function, boundArguments.ToImmutable());
+        }
+
+        private bool MatchArgumentsAndParameters(ImmutableArray<BoundExpression> arguments, ImmutableArray<ParameterSymbol> parameters)
+        {
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                var argument = arguments[i];
+                var expected = parameters[i];
+                var conversion = Conversion.Classify(argument.Type, expected.Type);
+
+                if (!conversion.Exists || conversion.IsExplicit)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private BoundExpression BindMemberAccessExpression(MemberAccessExpressionSyntax syntax)
+        {
+            if (syntax.Expression.Kind == SyntaxKind.NameExpression)
+            {
+                if (!(BindExpression(syntax.Expression) is BoundVariableExpression expr))
+                {
+                    Diagnostics.ReportNotAStruct(syntax.Expression.Location, syntax.Expression.ToString());
+                    return new BoundErrorExpression(syntax);
+                }
+
+                var variable = BindFieldReference(expr, syntax.IdentifierToken);
+
+                if (variable == null)
+                {
+                    Diagnostics.ReportCannotAccessMember(syntax.IdentifierToken.Location, ((NameExpressionSyntax)syntax.Expression).IdentifierToken.Text);
+                    return new BoundErrorExpression(syntax);
+                }
+                
+                return new BoundFieldAccessExpression(syntax, expr, variable);
+            }
+            else if (syntax.Expression.Kind == SyntaxKind.MemberAccessExpression)
+            {
+                if (!(BindExpression(syntax.Expression) is BoundFieldAccessExpression expr))
+                {
+                    Diagnostics.ReportNotAStruct(syntax.Expression.Location, syntax.Expression.ToString());
+                    return new BoundErrorExpression(syntax);
+                }
+
+                var variable = BindFieldReference(expr, syntax.IdentifierToken);
+
+                if (variable == null)
+                {
+                    Diagnostics.ReportCannotAccessMember(syntax.IdentifierToken.Location, ((MemberAccessExpressionSyntax)syntax.Expression).IdentifierToken.Text);
+                    return new BoundErrorExpression(syntax);
+                }
+
+                return new BoundFieldAccessExpression(syntax, expr, variable);
+            }
+            else
+            {
+                Diagnostics.ReportCannotAccessMember(syntax.Expression.Location, syntax.Expression.ToString());
+                return new BoundErrorExpression(syntax);
+            }
         }
 
         private BoundExpression BindConversion(ExpressionSyntax syntax, TypeSymbol type, bool allowExplicit = false)
@@ -877,6 +988,41 @@ namespace EV2.CodeAnalysis.Binding
                 Diagnostics.ReportSymbolAlreadyDeclared(identifier.Location, name);
 
             return variable;
+        }
+
+        private VariableSymbol? BindFieldReference(BoundExpression variable, SyntaxToken memberIdentifier)
+        {
+            // Get type of variable, make sure it's a struct
+            if (variable.Type.Kind != SymbolKind.Struct)
+            {
+                if (variable is BoundVariableExpression v)
+                {
+                    Diagnostics.ReportNotAStruct(variable.Syntax.Location, v.Variable.Name);
+                }
+                else if (variable is BoundFieldAccessExpression f)
+                {
+                    Diagnostics.ReportNotAStruct(variable.Syntax.Location, f.StructMember.Name);
+                }
+                else
+                {
+                    throw new Exception($"Unexpected expression type '{variable.Kind}'.");
+                }
+
+                return null;
+            }
+
+            // Check if the struct has a member with the name of memberIdentifier
+            var type = (StructSymbol)variable.Type;
+
+            foreach (var member in type.Members)
+            {
+                if (member.Name == memberIdentifier.Text)
+                {
+                    return member;
+                }
+            }
+
+            return null;
         }
 
         private VariableSymbol? BindVariableReference(SyntaxToken identifierToken)

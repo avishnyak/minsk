@@ -25,7 +25,9 @@ namespace EV2.CodeAnalysis.Syntax
             {
                 var first = GetChildren().First().Span;
                 var last = GetChildren().Last().Span;
-                return TextSpan.FromBounds(first.Start, last.End);
+
+                // Sometimes nodes are parsed in reverse, so we need to handle both cases
+                return TextSpan.FromBounds(Math.Min(first.Start, last.Start), Math.Max(first.End, last.End));
             }
         }
 
@@ -35,7 +37,9 @@ namespace EV2.CodeAnalysis.Syntax
             {
                 var first = GetChildren().First().FullSpan;
                 var last = GetChildren().Last().FullSpan;
-                return TextSpan.FromBounds(first.Start, last.End);
+
+                // Sometimes nodes are parsed in reverse, so we need to handle both cases
+                return TextSpan.FromBounds(Math.Min(first.Start, last.Start), Math.Max(first.End, last.End));
             }
         }
 
@@ -112,6 +116,13 @@ namespace EV2.CodeAnalysis.Syntax
             {
                 writer.Write(" ");
                 writer.Write(token.Value);
+            }
+
+            if (token != null && token.Kind == SyntaxKind.IdentifierToken)
+            {
+                writer.Write(" (");
+                writer.Write(token.Text);
+                writer.Write(")");
             }
 
             if (isToConsole)

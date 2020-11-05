@@ -1,4 +1,3 @@
-using System;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 

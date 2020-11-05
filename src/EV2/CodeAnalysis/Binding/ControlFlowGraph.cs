@@ -1,11 +1,8 @@
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using EV2.CodeAnalysis.Symbols;
-using EV2.CodeAnalysis.Syntax;
 
 namespace EV2.CodeAnalysis.Binding
 {
@@ -98,18 +95,21 @@ namespace EV2.CodeAnalysis.Binding
                             StartBlock();
                             _statements.Add(statement);
                             break;
+
                         case BoundNodeKind.GotoStatement:
                         case BoundNodeKind.ConditionalGotoStatement:
                         case BoundNodeKind.ReturnStatement:
                             _statements.Add(statement);
                             StartBlock();
                             break;
+
                         case BoundNodeKind.NopStatement:
                         case BoundNodeKind.VariableDeclaration:
                         case BoundNodeKind.SequencePointStatement:
                         case BoundNodeKind.ExpressionStatement:
                             _statements.Add(statement);
                             break;
+
                         default:
                             throw new Exception($"Unexpected statement: {statement.Kind}");
                     }
@@ -147,10 +147,10 @@ namespace EV2.CodeAnalysis.Binding
 
             public ControlFlowGraph Build(List<BasicBlock> blocks)
             {
-                if (!blocks.Any())
+                if (blocks.Count == 0)
                     Connect(_start, _end);
                 else
-                    Connect(_start, blocks.First());
+                    Connect(_start, blocks[0]);
 
                 foreach (var block in blocks)
                 {
@@ -177,6 +177,7 @@ namespace EV2.CodeAnalysis.Binding
                                 var toBlock = _blockFromLabel[gs.Label];
                                 Connect(current, toBlock);
                                 break;
+
                             case BoundNodeKind.ConditionalGotoStatement:
                                 var cgs = (BoundConditionalGotoStatement)statement;
                                 var thenBlock = _blockFromLabel[cgs.Label];
@@ -187,9 +188,11 @@ namespace EV2.CodeAnalysis.Binding
                                 Connect(current, thenBlock, thenCondition);
                                 Connect(current, elseBlock, elseCondition);
                                 break;
+
                             case BoundNodeKind.ReturnStatement:
                                 Connect(current, _end);
                                 break;
+
                             case BoundNodeKind.NopStatement:
                             case BoundNodeKind.VariableDeclaration:
                             case BoundNodeKind.LabelStatement:
@@ -198,13 +201,14 @@ namespace EV2.CodeAnalysis.Binding
                                 if (isLastStatementInBlock)
                                     Connect(current, next);
                                 break;
+
                             default:
                                 throw new Exception($"Unexpected statement: {statement.Kind}");
                         }
                     }
                 }
 
-            ScanAgain:
+                ScanAgain:
                 foreach (var block in blocks)
                 {
                     if (!block.Incoming.Any())
@@ -266,7 +270,7 @@ namespace EV2.CodeAnalysis.Binding
 
         public void WriteTo(TextWriter writer)
         {
-            string Quote(string text)
+            static string Quote(string text)
             {
                 return "\"" + text.TrimEnd().Replace("\\", "\\\\").Replace("\"", "\\\"").Replace(Environment.NewLine, "\\l") + "\"";
             }

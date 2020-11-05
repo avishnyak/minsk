@@ -209,9 +209,21 @@ namespace EV2.CodeAnalysis.Binding
                     return RewriteCallExpression((BoundCallExpression)node);
                 case BoundNodeKind.ConversionExpression:
                     return RewriteConversionExpression((BoundConversionExpression)node);
+                case BoundNodeKind.FieldAccessExpression:
+                    return RewriteFieldAccessExpression((BoundFieldAccessExpression)node);
                 default:
                     throw new Exception($"Unexpected node: {node.Kind}");
             }
+        }
+
+        private BoundExpression RewriteFieldAccessExpression(BoundFieldAccessExpression node)
+        {
+            var expression = RewriteExpression(node.StructInstance);
+
+            if (expression == node.StructInstance)
+                return node;
+
+            return new BoundFieldAccessExpression(expression.Syntax, expression, node.StructMember);
         }
 
         protected virtual BoundExpression RewriteErrorExpression(BoundErrorExpression node)

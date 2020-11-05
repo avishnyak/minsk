@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using EV2.CodeAnalysis.Text;
@@ -408,8 +407,15 @@ namespace EV2.CodeAnalysis.Syntax
         {
             if (Peek(0).Kind == SyntaxKind.IdentifierToken)
             {
+                SyntaxToken? identifierToken;
+                SyntaxToken? operatorToken;
+                ExpressionSyntax? right;
+
                 switch (Peek(1).Kind)
                 {
+                    case SyntaxKind.DotToken:
+                        return ParseMemberAccess();
+
                     case SyntaxKind.PlusEqualsToken:
                     case SyntaxKind.MinusEqualsToken:
                     case SyntaxKind.StarEqualsToken:
@@ -418,9 +424,10 @@ namespace EV2.CodeAnalysis.Syntax
                     case SyntaxKind.PipeEqualsToken:
                     case SyntaxKind.HatEqualsToken:
                     case SyntaxKind.EqualsToken:
-                        var identifierToken = NextToken();
-                        var operatorToken = NextToken();
-                        var right = ParseAssignmentExpression();
+                        identifierToken = NextToken();
+                        operatorToken = NextToken();
+                        right = ParseAssignmentExpression();
+
                         return new AssignmentExpressionSyntax(_syntaxTree, identifierToken, operatorToken, right);
                 }
 
@@ -428,14 +435,52 @@ namespace EV2.CodeAnalysis.Syntax
             return ParseBinaryExpression();
         }
 
+        private MemberAccessExpressionSyntax ParseMemberAccess()
+        {
+            var queue = new Queue<SyntaxToken>();
+            var condition = true;
+
+            while (condition)
+            {
+                queue.Enqueue(MatchToken(SyntaxKind.IdentifierToken));
+
+                if (Current.Kind == SyntaxKind.DotToken)
+                {
+                    queue.Enqueue(MatchToken(SyntaxKind.DotToken));
+                }
+                else
+                {
+                    condition = false;
+                }
+            }
+
+            var firstChild = new NameExpressionSyntax(_syntaxTree, queue.Dequeue());
+
+            return ParseMemberAccessInternal(queue, firstChild);
+        }
+
+        private MemberAccessExpressionSyntax ParseMemberAccessInternal(Queue<SyntaxToken> queue, ExpressionSyntax child)
+        {
+            var operatorToken = queue.Dequeue();
+            var identifier = queue.Dequeue();
+
+            if (queue.Count > 0)
+                return ParseMemberAccessInternal(queue, new MemberAccessExpressionSyntax(_syntaxTree, child, operatorToken, identifier));
+            else
+                return new MemberAccessExpressionSyntax(_syntaxTree, child, operatorToken, identifier);
+        }
+
         private ExpressionSyntax ParseBinaryExpression(int parentPrecedence = 0)
         {
             ExpressionSyntax left;
+
             var unaryOperatorPrecedence = Current.Kind.GetUnaryOperatorPrecedence();
+
             if (unaryOperatorPrecedence != 0 && unaryOperatorPrecedence >= parentPrecedence)
             {
                 var operatorToken = NextToken();
                 var operand = ParseBinaryExpression(unaryOperatorPrecedence);
+
                 left = new UnaryExpressionSyntax(_syntaxTree, operatorToken, operand);
             }
             else
@@ -446,11 +491,13 @@ namespace EV2.CodeAnalysis.Syntax
             while (true)
             {
                 var precedence = Current.Kind.GetBinaryOperatorPrecedence();
+
                 if (precedence == 0 || precedence <= parentPrecedence)
                     break;
 
                 var operatorToken = NextToken();
                 var right = ParseBinaryExpression(precedence);
+
                 left = new BinaryExpressionSyntax(_syntaxTree, left, operatorToken, right);
             }
 

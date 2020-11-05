@@ -1,1 +1,11 @@
-Hello world
+Declare Structs
+Access struct members
+p1.x: 0
+p1.y: 0
+p2.x: 1
+p2.y: 1
+Nested structs
+nested.start.x: 10
+nested.start.y: 10
+nested.end.x: 5
+nested.end.y: 5

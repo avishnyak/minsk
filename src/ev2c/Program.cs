@@ -18,6 +18,7 @@ namespace EV2
             var referencePaths = new List<string>();
             var sourcePaths = new List<string>();
             var helpRequested = false;
+            var verbosity = 0;
 
             var options = new OptionSet
             {
@@ -25,6 +26,7 @@ namespace EV2
                 { "r=", "The {path} of an assembly to reference", v => referencePaths.Add(v) },
                 { "o=", "The output {path} of the assembly to create", v => outputPath = v },
                 { "m=", "The {name} of the module", v => moduleName = v },
+                { "v=", "Sets max output verbosity", (int v) => verbosity = v },
                 { "?|h|help", "Prints help", _ => helpRequested = true },
                 { "<>", v => sourcePaths.Add(v) }
             };
@@ -81,6 +83,14 @@ namespace EV2
             await compilerService.Initialize();
 
             syntaxTrees.AddRange(await compilerService.Parse(sourcePaths));
+
+            if (verbosity > 0)
+            {
+                foreach (var tree in syntaxTrees)
+                {
+                    tree.Root.WriteTo(Console.Out);
+                }
+            }
 
             if (compilerHost.Errors > 0) {
                 Console.Out.WriteBuildSummary(false, compilerHost.Errors, compilerHost.Warnings);

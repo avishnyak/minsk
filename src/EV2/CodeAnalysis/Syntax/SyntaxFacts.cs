@@ -5,6 +5,19 @@ namespace EV2.CodeAnalysis.Syntax
 {
     public static class SyntaxFacts
     {
+        public static int GetPostfixOperatorPrecedence(this SyntaxKind kind)
+        {
+            switch (kind)
+            {
+                case SyntaxKind.DotToken:
+                    return 7;
+
+                default:
+                    return 0;
+            }
+
+        }
+
         public static int GetUnaryOperatorPrecedence(this SyntaxKind kind)
         {
             switch (kind)
@@ -114,6 +127,7 @@ namespace EV2.CodeAnalysis.Syntax
         public static IEnumerable<SyntaxKind> GetBinaryOperatorKinds()
         {
             var kinds = (SyntaxKind[]) Enum.GetValues(typeof(SyntaxKind));
+
             foreach (var kind in kinds)
             {
                 if (GetBinaryOperatorPrecedence(kind) > 0)
@@ -187,6 +201,8 @@ namespace EV2.CodeAnalysis.Syntax
                     return ":";
                 case SyntaxKind.CommaToken:
                     return ",";
+                case SyntaxKind.DotToken:
+                    return ".";
                 case SyntaxKind.BreakKeyword:
                     return "break";
                 case SyntaxKind.ContinueKeyword:

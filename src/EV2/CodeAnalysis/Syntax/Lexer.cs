@@ -229,6 +229,10 @@ namespace EV2.CodeAnalysis.Syntax
                 case '\0':
                     _kind = SyntaxKind.EndOfFileToken;
                     break;
+                case '.':
+                    _kind = SyntaxKind.DotToken;
+                    _position++;
+                    break;
                 case '+':
                     _position++;
                     if (Current != '=')

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -65,6 +66,8 @@ namespace EV2.CompilerService
                                                          CancellationToken cancellationToken = default)
         {
             var syntaxTrees = new ConcurrentBag<SyntaxTree>();
+
+            // Debugger.Launch();
 
             // Use ParallelOptions instance to store the CancellationToken
             ParallelOptions po = new ParallelOptions()

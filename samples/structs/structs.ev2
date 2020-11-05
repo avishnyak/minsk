@@ -1,11 +1,45 @@
 struct Point
 {
     var x = 0
-    var y = 0
+    var y: int
+}
+
+struct Line
+{
+    var start: Point
+    var end: Point
 }
 
 function main()
 {
-    print("Hello world")
-    var p: Point = Point(1, 1)
+
+    var p: Point = Point()
+    print(p.x.test)
+
+    /*
+    print("Declare Structs")
+    // Using the default constructor
+    var p1: Point = Point()
+
+    // Using an auto-generated constructor
+    var p2: Point = Point(1, 1)
+
+    print("Access struct members")
+    print("p1.x: " + string(p1.x))
+    print("p1.y: " + string(p1.y))
+
+    print("p2.x: " + string(p2.x))
+    print("p2.y: " + string(p2.y))
+
+    print("Nested structs")
+    var nested = Line(Point(10, 10), Point(5, 5))
+    // nested.start.x = 15
+    print("nested.start.x: " + string(nested.start.x))
+    print("nested.start.y: " + string(nested.start.y))
+
+    // Assign nested struct to local variable
+    var end = nested.end
+    print("nested.end.x: " + string(end.x))
+    print("nested.end.y: " + string(end.y))
+    */
 }

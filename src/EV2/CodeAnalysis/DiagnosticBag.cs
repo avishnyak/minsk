@@ -94,6 +94,12 @@ namespace EV2.CodeAnalysis
             ReportError(location, message);
         }
 
+        public void ReportNotAStruct(TextLocation location, string name)
+        {
+            var message = $"'{name}' is not a struct.";
+            ReportError(location, message);
+        }
+
         public void ReportUndefinedType(TextLocation location, string name)
         {
             var message = $"Type '{name}' doesn't exist.";
@@ -212,6 +218,12 @@ namespace EV2.CodeAnalysis
         {
             var message = $"The reference is not a valid .NET assembly: '{path}'.";
             ReportError(default, message);
+        }
+
+        internal void ReportCannotAccessMember(TextLocation location, string text)
+        {
+            var message = $"Cannot access members of '{text}'. Only members of structs can be accessed using the '.' operator.";
+            ReportError(location, message);
         }
 
         public void ReportRequiredTypeNotFound(string? ev2Name, string metadataName)

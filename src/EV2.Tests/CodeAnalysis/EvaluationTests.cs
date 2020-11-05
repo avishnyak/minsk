@@ -10,7 +10,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_VariableDeclaration_Reports_Redeclaration()
         {
-            var text = @"
+            const string? text = @"
                 {
                     var x = 10
                     var y = 100
@@ -21,7 +21,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 'x' is already declared.
             ";
 
@@ -31,12 +31,12 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_BlockStatement_NoInfiniteLoop()
         {
-            var text = @"
+            const string? text = @"
                 {
                 [)][]
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unexpected token <CloseParenthesisToken>, expected <IdentifierToken>.
                 Unexpected token <EndOfFileToken>, expected <CloseBraceToken>.
             ";
@@ -47,11 +47,11 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_InvokeFunctionArguments_Missing()
         {
-            var text = @"
+            const string? text = @"
                 print([)]
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Function 'print' requires 1 arguments but was given 0.
             ";
 
@@ -61,11 +61,11 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_InvokeFunctionArguments_Exceeding()
         {
-            var text = @"
+            const string? text = @"
                 print(""Hello""[, "" "", "" world!""])
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Function 'print' requires 1 arguments but was given 3.
             ";
 
@@ -75,11 +75,11 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_InvokeFunctionArguments_NoInfiniteLoop()
         {
-            var text = @"
+            const string? text = @"
                 print(""Hi""[[=]][)]
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unexpected token <EqualsToken>, expected <CloseParenthesisToken>.
                 Unexpected token <EqualsToken>, expected <IdentifierToken>.
                 Unexpected token <CloseParenthesisToken>, expected <IdentifierToken>.
@@ -91,14 +91,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_FunctionParameters_NoInfiniteLoop()
         {
-            var text = @"
+            const string? text = @"
                 function hi(name: string[[[=]]][)]
                 {
                     print(""Hi "" + name + ""!"" )
                 }[]
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unexpected token <EqualsToken>, expected <CloseParenthesisToken>.
                 Unexpected token <EqualsToken>, expected <OpenBraceToken>.
                 Unexpected token <EqualsToken>, expected <IdentifierToken>.
@@ -112,13 +112,13 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_FunctionReturn_Missing()
         {
-            var text = @"
+            const string? text = @"
                 function [add](a: int, b: int): int
                 {
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Not all code paths return a value.
             ";
 
@@ -128,7 +128,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_IfStatement_Reports_CannotConvert()
         {
-            var text = @"
+            const string? text = @"
                 {
                     var x = 0
                     if [10]
@@ -136,7 +136,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Cannot convert type 'int' to 'bool'.
             ";
 
@@ -146,7 +146,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_WhileStatement_Reports_CannotConvert()
         {
-            var text = @"
+            const string? text = @"
                 {
                     var x = 0
                     while [10]
@@ -154,7 +154,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Cannot convert type 'int' to 'bool'.
             ";
 
@@ -164,7 +164,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_DoWhileStatement_Reports_CannotConvert()
         {
-            var text = @"
+            const string? text = @"
                 {
                     var x = 0
                     do
@@ -173,7 +173,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Cannot convert type 'int' to 'bool'.
             ";
 
@@ -183,7 +183,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_ForStatement_Reports_CannotConvert_LowerBound()
         {
-            var text = @"
+            const string? text = @"
                 {
                     var result = 0
                     for i = [false] to 10
@@ -191,7 +191,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Cannot convert type 'bool' to 'int'.
             ";
 
@@ -201,7 +201,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_ForStatement_Reports_CannotConvert_UpperBound()
         {
-            var text = @"
+            const string? text = @"
                 {
                     var result = 0
                     for i = 1 to [true]
@@ -209,7 +209,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Cannot convert type 'bool' to 'int'.
             ";
 
@@ -219,9 +219,9 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_NameExpression_Reports_Undefined()
         {
-            var text = @"[x] * 10";
+            const string? text = @"[x] * 10";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Variable 'x' doesn't exist.
             ";
 
@@ -231,9 +231,9 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_NameExpression_Reports_NoErrorForInsertedToken()
         {
-            var text = @"1 + []";
+            const string? text = @"1 + []";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unexpected token <EndOfFileToken>, expected <IdentifierToken>.
             ";
 
@@ -243,9 +243,9 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_UnaryExpression_Reports_Undefined()
         {
-            var text = @"[+]true";
+            const string? text = @"[+]true";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unary operator '+' is not defined for type 'bool'.
             ";
 
@@ -255,9 +255,9 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_BinaryExpression_Reports_Undefined()
         {
-            var text = @"10 [*] false";
+            const string? text = @"10 [*] false";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Binary operator '*' is not defined for types 'int' and 'bool'.
             ";
 
@@ -267,10 +267,10 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_CompoundExpression_Reports_Undefined()
         {
-            var text = @"var x = 10
+            const string? text = @"var x = 10
                          x [+=] false";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Binary operator '+=' is not defined for types 'int' and 'bool'.
             ";
 
@@ -280,9 +280,9 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_AssignmentExpression_Reports_Undefined()
         {
-            var text = @"[x] = 10";
+            const string? text = @"[x] = 10";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Variable 'x' doesn't exist.
             ";
 
@@ -292,9 +292,9 @@ namespace EV2.Tests.CodeAnalysis
          [Fact]
         public void Evaluator_CompoundExpression_Assignemnt_NonDefinedVariable_Reports_Undefined()
         {
-            var text = @"[x] += 10";
+            const string? text = @"[x] += 10";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Variable 'x' doesn't exist.
             ";
 
@@ -304,9 +304,9 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_AssignmentExpression_Reports_NotAVariable()
         {
-            var text = @"[print] = 42";
+            const string? text = @"[print] = 42";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 'print' is not a variable.
             ";
 
@@ -316,14 +316,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_AssignmentExpression_Reports_CannotAssign()
         {
-            var text = @"
+            const string? text = @"
                 {
                     let x = 10
                     x [=] 0
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Variable 'x' is read-only and cannot be assigned to.
             ";
 
@@ -333,14 +333,14 @@ namespace EV2.Tests.CodeAnalysis
          [Fact]
         public void Evaluator_CompoundDeclarationExpression_Reports_CannotAssign()
         {
-            var text = @"
+            const string? text = @"
                 {
                     let x = 10
                     x [+=] 1
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Variable 'x' is read-only and cannot be assigned to.
             ";
 
@@ -350,14 +350,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_AssignmentExpression_Reports_CannotConvert()
         {
-            var text = @"
+            const string? text = @"
                 {
                     var x = 10
                     x = [true]
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Cannot convert type 'bool' to 'int'.
             ";
 
@@ -367,9 +367,9 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_CallExpression_Reports_Undefined()
         {
-            var text = @"[foo](42)";
+            const string? text = @"[foo](42)";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Function 'foo' doesn't exist.
             ";
 
@@ -379,14 +379,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_CallExpression_Reports_NotAFunction()
         {
-            var text = @"
+            const string? text = @"
                 {
                     let foo = 42
                     [foo](42)
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 'foo' is not a function.
             ";
 
@@ -396,14 +396,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Variables_Can_Shadow_Functions()
         {
-            var text = @"
+            const string? text = @"
                 {
                     let print = 42
                     [print](""test"")
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 'print' is not a function.
             ";
 
@@ -413,14 +413,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Void_Function_Should_Not_Return_Value()
         {
-            var text = @"
+            const string? text = @"
                 function test()
                 {
                     return [1]
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Since the function 'test' does not return a value the 'return' keyword cannot be followed by an expression.
             ";
 
@@ -430,14 +430,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Function_With_ReturnValue_Should_Not_Return_Void()
         {
-            var text = @"
+            const string? text = @"
                 function test(): int
                 {
                     [return]
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 An expression of type 'int' is expected.
             ";
 
@@ -447,7 +447,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Not_All_Code_Paths_Return_Value()
         {
-            var text = @"
+            const string? text = @"
                 function [test](n: int): bool
                 {
                     if (n > 10)
@@ -455,7 +455,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Not all code paths return a value.
             ";
 
@@ -465,7 +465,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Expression_Must_Have_Value()
         {
-            var text = @"
+            const string? text = @"
                 function test(n: int)
                 {
                     return
@@ -474,7 +474,7 @@ namespace EV2.Tests.CodeAnalysis
                 let value = [test(100)]
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Expression must have a value.
             ";
 
@@ -484,7 +484,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_IfStatement_Reports_NotReachableCode_Warning()
         {
-            var text = @"
+            const string? text = @"
                 function test()
                 {
                     let x = 4 * 3
@@ -499,7 +499,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unreachable code detected.
             ";
             AssertDiagnostics(text, diagnostics);
@@ -508,7 +508,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_ElseStatement_Reports_NotReachableCode_Warning()
         {
-            var text = @"
+            const string? text = @"
                 function test(): int
                 {
                     if true
@@ -522,7 +522,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unreachable code detected.
             ";
 
@@ -532,7 +532,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_WhileStatement_Reports_NotReachableCode_Warning()
         {
-            var text = @"
+            const string? text = @"
                 function test()
                 {
                     while false
@@ -542,7 +542,7 @@ namespace EV2.Tests.CodeAnalysis
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unreachable code detected.
             ";
 
@@ -564,14 +564,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Parameter_Already_Declared()
         {
-            var text = @"
+            const string? text = @"
                 function sum(a: int, b: int, [a: int]): int
                 {
                     return a + b + c
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 A parameter with the name 'a' already exists.
             ";
 
@@ -581,14 +581,14 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Function_Must_Have_Name()
         {
-            var text = @"
+            const string? text = @"
                 function [(]a: int, b: int): int
                 {
                     return a + b
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Unexpected token <OpenParenthesisToken>, expected <IdentifierToken>.
             ";
 
@@ -598,7 +598,7 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Wrong_Argument_Type()
         {
-            var text = @"
+            const string? text = @"
                 function test(n: int): bool
                 {
                     return n > 10
@@ -607,7 +607,7 @@ namespace EV2.Tests.CodeAnalysis
                 test([testValue])
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Cannot convert type 'string' to 'int'. An explicit conversion exists (are you missing a cast?)
             ";
 
@@ -617,14 +617,31 @@ namespace EV2.Tests.CodeAnalysis
         [Fact]
         public void Evaluator_Bad_Type()
         {
-            var text = @"
+            const string? text = @"
                 function test(n: [invalidtype])
                 {
                 }
             ";
 
-            var diagnostics = @"
+            const string? diagnostics = @"
                 Type 'invalidtype' doesn't exist.
+            ";
+
+            AssertDiagnostics(text, diagnostics);
+        }
+
+        [Fact]
+        public void Evaluator_Cannot_Access_Member()
+        {
+            const string? text = @"
+                var p: int = 0
+
+                print([p].[length])
+            ";
+
+            const string? diagnostics = @"
+                'p' is not a struct.
+                Cannot access members of 'p'. Only members of structs can be accessed using the '.' operator.
             ";
 
             AssertDiagnostics(text, diagnostics);
