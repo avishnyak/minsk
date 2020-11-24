@@ -12,11 +12,6 @@ struct Line
 
 function main()
 {
-
-    var p: Point = Point()
-    print(p.x.test)
-
-    /*
     print("Declare Structs")
     // Using the default constructor
     var p1: Point = Point()
@@ -33,7 +28,6 @@ function main()
 
     print("Nested structs")
     var nested = Line(Point(10, 10), Point(5, 5))
-    // nested.start.x = 15
     print("nested.start.x: " + string(nested.start.x))
     print("nested.start.y: " + string(nested.start.y))
 
@@ -41,5 +35,17 @@ function main()
     var end = nested.end
     print("nested.end.x: " + string(end.x))
     print("nested.end.y: " + string(end.y))
-    */
+
+    print("Assign struct members")
+    // Assign to struct members
+    p1.x = 10
+    p1.y = 10
+    print("p1.x: " + string(p1.x))
+    print("p1.y: " + string(p1.y))
+
+    // Assignment + Operator for struct members
+    p1.x += 1
+    p1.y -= 1
+    print("p1.x: " + string(p1.x))
+    print("p1.y: " + string(p1.y))
 }

@@ -47,7 +47,7 @@ namespace EV2.CodeAnalysis.Syntax
                         }
 
                         badTokens.Clear();
-                        token =  new SyntaxToken(token.SyntaxTree, token.Kind, token.Position, token.Text, token.Value, leadingTrivia.ToImmutable(), token.TrailingTrivia);
+                        token = new SyntaxToken(token.SyntaxTree, token.Kind, token.Position, token.Text, token.Value, leadingTrivia.ToImmutable(), token.TrailingTrivia);
                     }
 
                     tokens.Add(token);
@@ -400,41 +400,12 @@ namespace EV2.CodeAnalysis.Syntax
 
         private ExpressionSyntax ParseExpression()
         {
-            return ParseAssignmentExpression();
-        }
-
-        private ExpressionSyntax ParseAssignmentExpression()
-        {
-            if (Peek(0).Kind == SyntaxKind.IdentifierToken)
-            {
-                SyntaxToken? identifierToken;
-                SyntaxToken? operatorToken;
-                ExpressionSyntax? right;
-
-                switch (Peek(1).Kind)
-                {
-                    case SyntaxKind.DotToken:
-                        return ParseMemberAccess();
-
-                    case SyntaxKind.PlusEqualsToken:
-                    case SyntaxKind.MinusEqualsToken:
-                    case SyntaxKind.StarEqualsToken:
-                    case SyntaxKind.SlashEqualsToken:
-                    case SyntaxKind.AmpersandEqualsToken:
-                    case SyntaxKind.PipeEqualsToken:
-                    case SyntaxKind.HatEqualsToken:
-                    case SyntaxKind.EqualsToken:
-                        identifierToken = NextToken();
-                        operatorToken = NextToken();
-                        right = ParseAssignmentExpression();
-
-                        return new AssignmentExpressionSyntax(_syntaxTree, identifierToken, operatorToken, right);
-                }
-
-            }
             return ParseBinaryExpression();
         }
 
+        /// <summary>
+        /// MemberAccessExpr := IDENT (DOT IDENT)*
+        /// </summary>
         private MemberAccessExpressionSyntax ParseMemberAccess()
         {
             var queue = new Queue<SyntaxToken>();
@@ -461,6 +432,7 @@ namespace EV2.CodeAnalysis.Syntax
 
         private MemberAccessExpressionSyntax ParseMemberAccessInternal(Queue<SyntaxToken> queue, ExpressionSyntax child)
         {
+            // PERF: Change to iteration instead of recursion
             var operatorToken = queue.Dequeue();
             var identifier = queue.Dequeue();
 
@@ -470,6 +442,10 @@ namespace EV2.CodeAnalysis.Syntax
                 return new MemberAccessExpressionSyntax(_syntaxTree, child, operatorToken, identifier);
         }
 
+        /// <summary>
+        /// UnaryExpr := (Op)? Expr
+        /// BinaryExpr := UnaryExpr Op BinaryExpr
+        /// </summary>
         private ExpressionSyntax ParseBinaryExpression(int parentPrecedence = 0)
         {
             ExpressionSyntax left;
@@ -525,6 +501,11 @@ namespace EV2.CodeAnalysis.Syntax
                     return ParseDefaultLiteral();
 
                 case SyntaxKind.IdentifierToken:
+                    if (Peek(1).Kind == SyntaxKind.DotToken)
+                        return ParseMemberAccess();
+                    else
+                        return ParseNameOrCallExpression();
+
                 default:
                     return ParseNameOrCallExpression();
             }

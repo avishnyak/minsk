@@ -286,7 +286,7 @@ namespace EV2.CodeAnalysis.Lowering
             //
             // a = (a <op> b)
 
-            var result = Assignment(
+            return Assignment(
                 newNode.Syntax,
                 newNode.Variable,
                 Binary(
@@ -296,8 +296,28 @@ namespace EV2.CodeAnalysis.Lowering
                     newNode.Expression
                 )
             );
+        }
 
-            return result;
+        protected override BoundExpression RewriteCompoundFieldAssignmentExpression(BoundCompoundFieldAssignmentExpression node)
+        {
+            var newNode =(BoundCompoundFieldAssignmentExpression) base.RewriteCompoundFieldAssignmentExpression(node);
+
+            // a.f <op>= b
+            //
+            // ---->
+            //
+            // a.f = (a.f <op> b)
+            return Assignment(
+                newNode.Syntax,
+                newNode.StructInstance,
+                newNode.StructMember,
+                Binary(
+                    newNode.Syntax,
+                    Field(newNode.Syntax, newNode.StructInstance, newNode.StructMember),
+                    newNode.Op,
+                    newNode.Expression
+                )
+            );
         }
     }
 }

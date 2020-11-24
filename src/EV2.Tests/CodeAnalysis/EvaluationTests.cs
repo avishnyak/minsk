@@ -76,12 +76,10 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_InvokeFunctionArguments_NoInfiniteLoop()
         {
             const string? text = @"
-                print(""Hi""[[=]][)]
+                print(""Hi""=[)]
             ";
 
             const string? diagnostics = @"
-                Unexpected token <EqualsToken>, expected <CloseParenthesisToken>.
-                Unexpected token <EqualsToken>, expected <IdentifierToken>.
                 Unexpected token <CloseParenthesisToken>, expected <IdentifierToken>.
             ";
 
@@ -92,7 +90,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_FunctionParameters_NoInfiniteLoop()
         {
             const string? text = @"
-                function hi(name: string[[[=]]][)]
+                function hi(name: string[[[=]]][[)]]
                 {
                     print(""Hi "" + name + ""!"" )
                 }[]
@@ -102,6 +100,7 @@ namespace EV2.Tests.CodeAnalysis
                 Unexpected token <EqualsToken>, expected <CloseParenthesisToken>.
                 Unexpected token <EqualsToken>, expected <OpenBraceToken>.
                 Unexpected token <EqualsToken>, expected <IdentifierToken>.
+                Unexpected token <CloseParenthesisToken>, expected <IdentifierToken>.
                 Unexpected token <CloseParenthesisToken>, expected <IdentifierToken>.
                 Unexpected token <EndOfFileToken>, expected <CloseBraceToken>.
             ";

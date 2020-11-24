@@ -109,4 +109,10 @@ function main()
     print("\: "test\" != \"abc\"" + string(\"test\" != \"abc\"))
     print("\: "test\" + \"abc\"" + string(\"test\" + \"abc\"))
     */
+
+    var int_type5 = 0
+    int_type5 += 1
+    print("int_type5 += 1: " + string(int_type5))
+    int_type5 -= 1
+    print("int_type5 -= 1: " + string(int_type5))
 }

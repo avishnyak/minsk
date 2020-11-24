@@ -26,8 +26,10 @@ namespace EV2.CodeAnalysis.Binding
         ConversionExpression,
         ErrorExpression,
         FieldAccessExpression,
+        FieldAssignmentExpression,
         LiteralExpression,
         UnaryExpression,
         VariableExpression,
+        CompoundFieldAssignmentExpression,
     }
 }

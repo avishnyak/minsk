@@ -9,3 +9,8 @@ nested.start.x: 10
 nested.start.y: 10
 nested.end.x: 5
 nested.end.y: 5
+Assign struct members
+p1.x: 10
+p1.y: 10
+p1.x: 11
+p1.y: 9

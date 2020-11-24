@@ -368,8 +368,10 @@ namespace EV2.CodeAnalysis.Binding
                 {
                     var isAllowedExpression = es.Expression.Kind == BoundNodeKind.ErrorExpression ||
                                               es.Expression.Kind == BoundNodeKind.AssignmentExpression ||
+                                              es.Expression.Kind == BoundNodeKind.FieldAssignmentExpression ||
                                               es.Expression.Kind == BoundNodeKind.CallExpression ||
-                                              es.Expression.Kind == BoundNodeKind.CompoundAssignmentExpression;
+                                              es.Expression.Kind == BoundNodeKind.CompoundAssignmentExpression ||
+                                              es.Expression.Kind == BoundNodeKind.CompoundFieldAssignmentExpression;
 
                     if (!isAllowedExpression)
                         Diagnostics.ReportInvalidExpressionStatement(syntax.Location);
@@ -779,6 +781,65 @@ namespace EV2.CodeAnalysis.Binding
 
             if (boundLeft.Type == TypeSymbol.Error || boundRight.Type == TypeSymbol.Error)
                 return new BoundErrorExpression(syntax);
+
+            if (syntax.OperatorToken.Kind.IsAssignmentOperator())
+            {
+                if (boundLeft is BoundVariableExpression variable)
+                {
+                    if (variable.Variable.IsReadOnly)
+                        Diagnostics.ReportCannotAssign(syntax.OperatorToken.Location, variable.Variable.Name);
+
+                    if (syntax.OperatorToken.Kind != SyntaxKind.EqualsToken)
+                    {
+                        var equivalentOperatorTokenKind = SyntaxFacts.GetBinaryOperatorOfAssignmentOperator(syntax.OperatorToken.Kind);
+                        var boundAssignOperator = BoundBinaryOperator.Bind(equivalentOperatorTokenKind, variable.Type, boundRight.Type);
+
+                        if (boundAssignOperator == null)
+                        {
+                            Diagnostics.ReportUndefinedBinaryOperator(syntax.OperatorToken.Location, syntax.OperatorToken.Text, variable.Type, boundRight.Type);
+                            return new BoundErrorExpression(syntax);
+                        }
+
+                        var convertedExpression = BindConversion(syntax.Right.Location, boundRight, variable.Type);
+                        return new BoundCompoundAssignmentExpression(syntax, variable.Variable, boundAssignOperator, convertedExpression);
+                    }
+                    else
+                    {
+                        var convertedExpression = BindConversion(syntax.Right.Location, boundRight, variable.Type);
+                        return new BoundAssignmentExpression(syntax, variable.Variable, convertedExpression);
+                    }
+                }
+
+                if (boundLeft is BoundFieldAccessExpression field)
+                {
+                    if (field.StructMember.IsReadOnly)
+                        Diagnostics.ReportCannotAssign(syntax.OperatorToken.Location, field.StructMember.Name);
+
+                    if (syntax.OperatorToken.Kind != SyntaxKind.EqualsToken)
+                    {
+                        var equivalentOperatorTokenKind = SyntaxFacts.GetBinaryOperatorOfAssignmentOperator(syntax.OperatorToken.Kind);
+                        var boundAssignOperator = BoundBinaryOperator.Bind(equivalentOperatorTokenKind, field.StructMember.Type, boundRight.Type);
+
+                        if (boundAssignOperator == null)
+                        {
+                            Diagnostics.ReportUndefinedBinaryOperator(syntax.OperatorToken.Location, syntax.OperatorToken.Text, field.StructMember.Type, boundRight.Type);
+                            return new BoundErrorExpression(syntax);
+                        }
+
+                        var convertedExpression = BindConversion(syntax.Right.Location, boundRight, field.Type);
+                        return new BoundCompoundFieldAssignmentExpression(syntax, field.StructInstance, field.StructMember, boundAssignOperator, convertedExpression);
+                    }
+                    else
+                    {
+                        var convertedExpression = BindConversion(syntax.Right.Location, boundRight, field.Type);
+                        return new BoundFieldAssignmentExpression(syntax, field.StructInstance, field.StructMember, convertedExpression);
+                    }
+                }
+
+                // TODO: @CLEANUP
+                Diagnostics.ReportCannotAssign(syntax.OperatorToken.Location, "");
+                return new BoundErrorExpression(syntax);
+            }
 
             var boundOperator = BoundBinaryOperator.Bind(syntax.OperatorToken.Kind, boundLeft.Type, boundRight.Type);
 

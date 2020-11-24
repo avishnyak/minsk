@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Immutable;
-using EV2.CodeAnalysis.Syntax;
 
 namespace EV2.CodeAnalysis.Binding
 {
@@ -12,37 +11,50 @@ namespace EV2.CodeAnalysis.Binding
             {
                 case BoundNodeKind.BlockStatement:
                     return RewriteBlockStatement((BoundBlockStatement)node);
+
                 case BoundNodeKind.MemberBlockStatement:
                     return RewriteBlockStatement((BoundMemberBlockStatement)node);
+
                 case BoundNodeKind.NopStatement:
                     return RewriteNopStatement((BoundNopStatement)node);
+
                 case BoundNodeKind.VariableDeclaration:
                     return RewriteVariableDeclaration((BoundVariableDeclaration)node);
+
                 case BoundNodeKind.IfStatement:
                     return RewriteIfStatement((BoundIfStatement)node);
+
                 case BoundNodeKind.WhileStatement:
                     return RewriteWhileStatement((BoundWhileStatement)node);
+
                 case BoundNodeKind.DoWhileStatement:
                     return RewriteDoWhileStatement((BoundDoWhileStatement)node);
+
                 case BoundNodeKind.ForStatement:
                     return RewriteForStatement((BoundForStatement)node);
+
                 case BoundNodeKind.LabelStatement:
                     return RewriteLabelStatement((BoundLabelStatement)node);
+
                 case BoundNodeKind.GotoStatement:
                     return RewriteGotoStatement((BoundGotoStatement)node);
+
                 case BoundNodeKind.ConditionalGotoStatement:
                     return RewriteConditionalGotoStatement((BoundConditionalGotoStatement)node);
+
                 case BoundNodeKind.ReturnStatement:
                     return RewriteReturnStatement((BoundReturnStatement)node);
+
                 case BoundNodeKind.ExpressionStatement:
                     return RewriteExpressionStatement((BoundExpressionStatement)node);
+
                 case BoundNodeKind.SequencePointStatement:
                     return RewriteSequencePointStatement((BoundSequencePointStatement)node);
+
                 default:
                     throw new Exception($"Unexpected node: {node.Kind}");
             }
         }
-
 
         protected virtual BoundStatement RewriteBlockStatement(BoundStatement node)
         {
@@ -70,8 +82,7 @@ namespace EV2.CodeAnalysis.Binding
                     }
                 }
 
-                if (builder != null)
-                    builder.Add(newStatement);
+                builder?.Add(newStatement);
             }
 
             if (builder == null)
@@ -193,27 +204,65 @@ namespace EV2.CodeAnalysis.Binding
             {
                 case BoundNodeKind.ErrorExpression:
                     return RewriteErrorExpression((BoundErrorExpression)node);
+
                 case BoundNodeKind.LiteralExpression:
                     return RewriteLiteralExpression((BoundLiteralExpression)node);
+
                 case BoundNodeKind.VariableExpression:
                     return RewriteVariableExpression((BoundVariableExpression)node);
+
                 case BoundNodeKind.AssignmentExpression:
                     return RewriteAssignmentExpression((BoundAssignmentExpression)node);
+
                 case BoundNodeKind.CompoundAssignmentExpression:
                     return RewriteCompoundAssignmentExpression((BoundCompoundAssignmentExpression)node);
+
                 case BoundNodeKind.UnaryExpression:
                     return RewriteUnaryExpression((BoundUnaryExpression)node);
+
                 case BoundNodeKind.BinaryExpression:
                     return RewriteBinaryExpression((BoundBinaryExpression)node);
+
                 case BoundNodeKind.CallExpression:
                     return RewriteCallExpression((BoundCallExpression)node);
+
                 case BoundNodeKind.ConversionExpression:
                     return RewriteConversionExpression((BoundConversionExpression)node);
+
                 case BoundNodeKind.FieldAccessExpression:
                     return RewriteFieldAccessExpression((BoundFieldAccessExpression)node);
+
+                case BoundNodeKind.FieldAssignmentExpression:
+                    return RewriteFieldAssignmentExpression((BoundFieldAssignmentExpression)node);
+
+                case BoundNodeKind.CompoundFieldAssignmentExpression:
+                    return RewriteCompoundFieldAssignmentExpression((BoundCompoundFieldAssignmentExpression)node);
+
                 default:
                     throw new Exception($"Unexpected node: {node.Kind}");
             }
+        }
+
+        protected virtual BoundExpression RewriteCompoundFieldAssignmentExpression(BoundCompoundFieldAssignmentExpression node)
+        {
+            var structInstanceExpr = RewriteExpression(node.StructInstance);
+            var valueExpr = RewriteExpression(node.Expression);
+
+            if (structInstanceExpr == node.StructInstance && valueExpr == node.Expression)
+                return node;
+
+            return new BoundCompoundFieldAssignmentExpression(node.Syntax, structInstanceExpr, node.StructMember, node.Op, valueExpr);
+        }
+
+        private BoundExpression RewriteFieldAssignmentExpression(BoundFieldAssignmentExpression node)
+        {
+            var structInstanceExpr = RewriteExpression(node.StructInstance);
+            var valueExpr = RewriteExpression(node.Expression);
+
+            if (structInstanceExpr == node.StructInstance && valueExpr == node.Expression)
+                return node;
+
+            return new BoundFieldAssignmentExpression(node.StructInstance.Syntax, structInstanceExpr, node.StructMember, valueExpr);
         }
 
         private BoundExpression RewriteFieldAccessExpression(BoundFieldAccessExpression node)
@@ -286,7 +335,7 @@ namespace EV2.CodeAnalysis.Binding
         {
             ImmutableArray<BoundExpression>.Builder? builder = null;
 
-            for (var i = 0; i< node.Arguments.Length; i++)
+            for (var i = 0; i < node.Arguments.Length; i++)
             {
                 var oldArgument = node.Arguments[i];
                 var newArgument = RewriteExpression(oldArgument);

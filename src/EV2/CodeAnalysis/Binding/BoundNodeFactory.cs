@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Net;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 
@@ -57,9 +58,10 @@ namespace EV2.CodeAnalysis.Binding
         }
 
         public static BoundAssignmentExpression Assignment(SyntaxNode syntax, VariableSymbol variable, BoundExpression expression)
-        {
-            return new BoundAssignmentExpression(syntax, variable, expression);
-        }
+            => new BoundAssignmentExpression(syntax, variable, expression);
+
+        public static BoundFieldAssignmentExpression Assignment(SyntaxNode syntax, BoundExpression structInstance, VariableSymbol structMember, BoundExpression expression)
+            => new BoundFieldAssignmentExpression(syntax, structInstance, structMember, expression);
 
         public static BoundBinaryExpression Binary(SyntaxNode syntax, BoundExpression left, SyntaxKind kind, BoundExpression right)
         {
@@ -103,6 +105,9 @@ namespace EV2.CodeAnalysis.Binding
         {
             return new BoundVariableExpression(syntax, variable);
         }
+
+        public static BoundFieldAccessExpression Field(SyntaxNode syntax, BoundExpression structInstance, VariableSymbol structMember)
+            => new BoundFieldAccessExpression(syntax, structInstance, structMember);
 
         public static BoundLiteralExpression Literal(SyntaxNode syntax, object literal)
         {

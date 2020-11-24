@@ -564,9 +564,47 @@ namespace EV2.CodeAnalysis.Emit
                 case BoundNodeKind.FieldAccessExpression:
                     EmitFieldAccessExpression(ilProcessor, (BoundFieldAccessExpression)node);
                     break;
+                case BoundNodeKind.FieldAssignmentExpression:
+                    EmitFieldAssignmentExpression(ilProcessor, (BoundFieldAssignmentExpression)node);
+                    break;
                 default:
                     throw new Exception($"Unexpected node kind {node.Kind}");
             }
+        }
+
+        private void EmitFieldAssignmentExpression(ILProcessor ilProcessor, BoundFieldAssignmentExpression node)
+        {
+            var structSymbol = node.StructInstance.Type as StructSymbol;
+
+            Debug.Assert(structSymbol != null);
+
+            EmitExpression(ilProcessor, node.StructInstance);
+            EmitExpression(ilProcessor, node.Expression);
+
+            // We have to assign a the value to a local variable in case someone does
+            // something like:
+            // x = obj.field = 10
+            //
+            // The stack needs to keep a copy of the "Expression" value after the field assignment
+            ilProcessor.Emit(OpCodes.Dup);
+
+            var typeReference = _knownTypes[node.Expression.Type];
+            var variableDefinition = new VariableDefinition(typeReference);
+            ilProcessor.Body.Variables.Add(variableDefinition);
+            ilProcessor.Emit(OpCodes.Stloc, variableDefinition);
+
+            var @struct = _structs[structSymbol];
+
+            foreach (var field in @struct.Fields)
+            {
+                if (field.Name == node.StructMember.Name)
+                {
+                    ilProcessor.Emit(OpCodes.Stfld, field);
+                    break;
+                }
+            }
+
+            ilProcessor.Emit(OpCodes.Ldloc, variableDefinition);
         }
 
         private void EmitFieldAccessExpression(ILProcessor ilProcessor, BoundFieldAccessExpression node)
@@ -584,6 +622,7 @@ namespace EV2.CodeAnalysis.Emit
                 if (field.Name == node.StructMember.Name)
                 {
                     ilProcessor.Emit(OpCodes.Ldfld, field);
+                    break;
                 }
             }
         }

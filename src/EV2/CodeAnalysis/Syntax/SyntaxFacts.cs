@@ -39,7 +39,7 @@ namespace EV2.CodeAnalysis.Syntax
             {
                 case SyntaxKind.StarToken:
                 case SyntaxKind.SlashToken:
-                    return 5;
+                    return 6;
 
                 case SyntaxKind.PlusToken:
                 case SyntaxKind.MinusToken:
@@ -51,15 +51,25 @@ namespace EV2.CodeAnalysis.Syntax
                 case SyntaxKind.LessOrEqualsToken:
                 case SyntaxKind.GreaterToken:
                 case SyntaxKind.GreaterOrEqualsToken:
-                    return 3;
+                    return 4;
 
                 case SyntaxKind.AmpersandToken:
                 case SyntaxKind.AmpersandAmpersandToken:
-                    return 2;
+                    return 3;
 
                 case SyntaxKind.PipeToken:
                 case SyntaxKind.PipePipeToken:
                 case SyntaxKind.HatToken:
+                    return 2;
+
+                case SyntaxKind.PlusEqualsToken:
+                case SyntaxKind.MinusEqualsToken:
+                case SyntaxKind.StarEqualsToken:
+                case SyntaxKind.SlashEqualsToken:
+                case SyntaxKind.AmpersandEqualsToken:
+                case SyntaxKind.PipeEqualsToken:
+                case SyntaxKind.HatEqualsToken:
+                case SyntaxKind.EqualsToken:
                     return 1;
 
                 default:
@@ -253,6 +263,18 @@ namespace EV2.CodeAnalysis.Syntax
                 default:
                     return false;
             }
+        }
+
+        public static bool IsAssignmentOperator(this SyntaxKind kind)
+        {
+            return kind == SyntaxKind.PlusEqualsToken
+                || kind == SyntaxKind.MinusEqualsToken
+                || kind == SyntaxKind.StarEqualsToken
+                || kind == SyntaxKind.SlashEqualsToken
+                || kind == SyntaxKind.AmpersandEqualsToken
+                || kind == SyntaxKind.PipeEqualsToken
+                || kind == SyntaxKind.HatEqualsToken
+                || kind == SyntaxKind.EqualsToken;
         }
 
         public static bool IsKeyword(this SyntaxKind kind)

@@ -71,3 +71,5 @@ true: True
 false: False
 !true: False
 !false: True
+int_type5 += 1: 1
+int_type5 -= 1: 0

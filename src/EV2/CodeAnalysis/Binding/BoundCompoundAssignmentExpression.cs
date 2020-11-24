@@ -1,4 +1,4 @@
-﻿using EV2.CodeAnalysis.Symbols;
+using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 
 namespace EV2.CodeAnalysis.Binding
