@@ -54,11 +54,11 @@ namespace EV2.CodeAnalysis.Symbols
 
             writer.WritePunctuation(SyntaxKind.CloseParenthesisToken);
 
-            if (symbol.Type != TypeSymbol.Void)
+            if (symbol.ReturnType != TypeSymbol.Void)
             {
                 writer.WritePunctuation(SyntaxKind.ColonToken);
                 writer.WriteSpace();
-                symbol.Type.WriteTo(writer);
+                symbol.ReturnType.WriteTo(writer);
             }
         }
 

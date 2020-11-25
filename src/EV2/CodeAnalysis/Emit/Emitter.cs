@@ -359,8 +359,9 @@ namespace EV2.CodeAnalysis.Emit
 
         private void EmitFunctionDeclaration(FunctionSymbol function)
         {
-            var functionType = _knownTypes[function.Type];
-            var method = new MethodDefinition(function.Name, MethodAttributes.Static | MethodAttributes.Private, functionType);
+            var functionType = _knownTypes[function.ReturnType];
+            var methodAttributes = function.Receiver == null ? MethodAttributes.Static | MethodAttributes.Private : MethodAttributes.Public;
+            var method = new MethodDefinition(function.Name, methodAttributes, functionType);
 
             foreach (var parameter in function.Parameters)
             {
@@ -371,7 +372,15 @@ namespace EV2.CodeAnalysis.Emit
                 method.Parameters.Add(parameterDefinition);
             }
 
-            _typeDefinition.Methods.Add(method);
+            if (function.Receiver == null)
+            {
+                _typeDefinition.Methods.Add(method);
+            }
+            else
+            {
+                _structs[function.Receiver].Methods.Add(method);
+            }
+
             _methods.Add(function, method);
         }
 

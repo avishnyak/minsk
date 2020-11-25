@@ -59,7 +59,7 @@ namespace EV2.CodeAnalysis.Lowering
                 }
             }
 
-            if (function is FunctionSymbol f && f.Type == TypeSymbol.Void)
+            if (function is FunctionSymbol f && f.ReturnType == TypeSymbol.Void)
             {
                 if (builder.Count == 0 || CanFallThrough(builder.Last()))
                 {

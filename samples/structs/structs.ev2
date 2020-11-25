@@ -1,7 +1,16 @@
+// Structs are reference types that can contain data.
 struct Point
 {
     var x = 0
     var y: int
+}
+
+// Structs can have functions "attached" to them. With this notation, it is
+// straight forward to be able to "augment" a struct with functions in multiple
+// files.
+function Point.double()
+{
+    print("Point.double")
 }
 
 struct Line

@@ -14,7 +14,7 @@ namespace EV2.CodeAnalysis.Binding
         }
 
         public override BoundNodeKind Kind => BoundNodeKind.CallExpression;
-        public override TypeSymbol Type => Function.Type;
+        public override TypeSymbol Type => Function.ReturnType;
         public FunctionSymbol Function { get; }
         public ImmutableArray<BoundExpression> Arguments { get; }
     }

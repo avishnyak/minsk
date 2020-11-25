@@ -98,7 +98,7 @@ namespace EV2.CodeAnalysis.Binding
 
             if (mainFunction != null)
             {
-                if (mainFunction.Type != TypeSymbol.Void || mainFunction.Parameters.Any())
+                if (mainFunction.ReturnType != TypeSymbol.Void || mainFunction.Parameters.Any())
                     binder.Diagnostics.ReportMainMustHaveCorrectSignature(mainFunction.Declaration!.Identifier.Location);
             }
 
@@ -161,13 +161,13 @@ namespace EV2.CodeAnalysis.Binding
                 // We will skip attempting to lower the bodies for these and allow the Emitter to automatically
                 // generate the code necessary.  This will avoid the potential of reporting diagnostic errors to
                 // the user for code they never wrote.
-                if (function.Type is StructSymbol) { continue;  }
+                if (function.ReturnType is StructSymbol) { continue;  }
 
                 var binder = new Binder(parentScope, function);
                 var body = binder.BindStatement(function.Declaration!.Body);
                 var loweredBody = Lowerer.Lower(function, body);
 
-                if (function.Type != TypeSymbol.Void && !ControlFlowGraph.AllPathsReturn(loweredBody))
+                if (function.ReturnType != TypeSymbol.Void && !ControlFlowGraph.AllPathsReturn(loweredBody))
                     binder.Diagnostics.ReportAllPathsMustReturn(function.Declaration.Identifier.Location);
 
                 functionBodies.Add(function, loweredBody);
@@ -294,8 +294,9 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             var type = BindTypeClause(syntax.Type) ?? TypeSymbol.Void;
+            var receiver = BindTypeClause(syntax.Receiver) as StructSymbol;
 
-            var function = new FunctionSymbol(syntax.Identifier.Text, parameters.ToImmutable(), type, syntax);
+            var function = new FunctionSymbol(syntax.Identifier.Text, parameters.ToImmutable(), type, syntax, receiver: receiver);
 
             if (syntax.Identifier.Text != null && !_scope.TryDeclareFunction(function))
             {
@@ -510,15 +511,28 @@ namespace EV2.CodeAnalysis.Binding
             return new BoundLiteralExpression(syntax, type.DefaultValue);
         }
 
-        [return: NotNullIfNotNull("syntax")]
         private TypeSymbol? BindTypeClause(TypeClauseSyntax? syntax)
         {
             if (syntax == null)
                 return null;
 
             var type = LookupType(syntax.Identifier.Text);
+
             if (type == null)
                 Diagnostics.ReportUndefinedType(syntax.Identifier.Location, syntax.Identifier.Text);
+
+            return type;
+        }
+
+        private TypeSymbol? BindTypeClause(SyntaxToken? identifier)
+        {
+            if (identifier == null || string.IsNullOrWhiteSpace(identifier.Text))
+                return null;
+
+            var type = LookupType(identifier.Text);
+
+            if (type == null)
+                Diagnostics.ReportUndefinedType(identifier.Location, identifier.Text);
 
             return type;
         }
@@ -629,7 +643,7 @@ namespace EV2.CodeAnalysis.Binding
             }
             else
             {
-                if (_function.Type == TypeSymbol.Void)
+                if (_function.ReturnType == TypeSymbol.Void)
                 {
                     if (expression != null)
                         Diagnostics.ReportInvalidReturnExpression(syntax.Expression!.Location, _function.Name);
@@ -637,9 +651,9 @@ namespace EV2.CodeAnalysis.Binding
                 else
                 {
                     if (expression == null)
-                        Diagnostics.ReportMissingReturnExpression(syntax.ReturnKeyword.Location, _function.Type);
+                        Diagnostics.ReportMissingReturnExpression(syntax.ReturnKeyword.Location, _function.ReturnType);
                     else
-                        expression = BindConversion(syntax.Expression!.Location, expression, _function.Type);
+                        expression = BindConversion(syntax.Expression!.Location, expression, _function.ReturnType);
                 }
             }
 
