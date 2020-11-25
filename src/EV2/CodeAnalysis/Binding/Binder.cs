@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using EV2.CodeAnalysis.Lowering;
@@ -501,14 +500,14 @@ namespace EV2.CodeAnalysis.Binding
             if (type is StructSymbol s)
             {
                 // Struct types default to calling their empty constructor
-                var ctorSyntaxToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.IdentifierToken, syntax.Span.End, s.Name, null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
+                var ctorSyntaxToken = new NameExpressionSyntax(syntax.SyntaxTree, new SyntaxToken(syntax.SyntaxTree, SyntaxKind.IdentifierToken, syntax.Span.End, s.Name, null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty));
                 var openParenToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.OpenParenthesisToken, syntax.Span.End, "(", null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
                 var closeParenToken = new SyntaxToken(syntax.SyntaxTree, SyntaxKind.CloseParenthesisToken, syntax.Span.End, ")", null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
 
                 return BindCallExpression(new CallExpressionSyntax(syntax.SyntaxTree, ctorSyntaxToken, openParenToken, new SeparatedSyntaxList<ExpressionSyntax>(ImmutableArray<SyntaxNode>.Empty), closeParenToken));
             }
 
-            return new BoundLiteralExpression(syntax, type.DefaultValue);
+            return new BoundLiteralExpression(syntax, type?.DefaultValue);
         }
 
         private TypeSymbol? BindTypeClause(TypeClauseSyntax? syntax)
@@ -957,7 +956,20 @@ namespace EV2.CodeAnalysis.Binding
                 boundArguments[i] = BindConversion(argumentLocation, argument, parameter.Type);
             }
 
-            return new BoundCallExpression(syntax, function, boundArguments.ToImmutable());
+            if (syntax.FullyQualifiedIdentifier is MemberAccessExpressionSyntax @struct)
+            {
+                var instance = BindMemberAccessExpression(@struct);
+                return instance switch
+                {
+                    BoundVariableExpression i => new BoundCallExpression(syntax, i, function, boundArguments.ToImmutable()),
+                    BoundFieldAccessExpression i => new BoundCallExpression(syntax, i, function, boundArguments.ToImmutable()),
+                    _ => new BoundErrorExpression(syntax)
+                };
+            }
+            else
+            {
+                    return new BoundCallExpression(syntax, function, boundArguments.ToImmutable());
+            }
         }
 
         private bool MatchArgumentsAndParameters(ImmutableArray<BoundExpression> arguments, ImmutableArray<ParameterSymbol> parameters)
@@ -989,13 +1001,20 @@ namespace EV2.CodeAnalysis.Binding
 
                 var variable = BindFieldReference(expr, syntax.IdentifierToken);
 
-                if (variable == null)
+                if (variable != null)
                 {
-                    Diagnostics.ReportCannotAccessMember(syntax.IdentifierToken.Location, ((NameExpressionSyntax)syntax.Expression).IdentifierToken.Text);
-                    return new BoundErrorExpression(syntax);
+                    return new BoundFieldAccessExpression(syntax, expr, variable);
                 }
-                
-                return new BoundFieldAccessExpression(syntax, expr, variable);
+
+                var func = BindFunctionReference(syntax.IdentifierToken);
+
+                if (func != null)
+                {
+                    return expr;
+                }
+
+                Diagnostics.ReportCannotAccessMember(syntax.IdentifierToken.Location, ((NameExpressionSyntax)syntax.Expression).IdentifierToken.Text);
+                return new BoundErrorExpression(syntax);
             }
             else if (syntax.Expression.Kind == SyntaxKind.MemberAccessExpression)
             {
@@ -1007,13 +1026,20 @@ namespace EV2.CodeAnalysis.Binding
 
                 var variable = BindFieldReference(expr, syntax.IdentifierToken);
 
-                if (variable == null)
+                if (variable != null)
                 {
-                    Diagnostics.ReportCannotAccessMember(syntax.IdentifierToken.Location, ((MemberAccessExpressionSyntax)syntax.Expression).IdentifierToken.Text);
-                    return new BoundErrorExpression(syntax);
+                    return new BoundFieldAccessExpression(syntax, expr, variable);
                 }
 
-                return new BoundFieldAccessExpression(syntax, expr, variable);
+                var func = BindFunctionReference(syntax.IdentifierToken);
+
+                if (func != null)
+                {
+                    return expr;
+                }
+
+                Diagnostics.ReportCannotAccessMember(syntax.IdentifierToken.Location, ((MemberAccessExpressionSyntax)syntax.Expression).IdentifierToken.Text);
+                return new BoundErrorExpression(syntax);
             }
             else
             {
@@ -1098,6 +1124,21 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             return null;
+        }
+
+        private FunctionSymbol? BindFunctionReference(SyntaxToken identifierToken)
+        {
+            var name = identifierToken.Text;
+
+            switch (_scope.TryLookupSymbol(name))
+            {
+                case FunctionSymbol func:
+                    return func;
+
+                default:
+                    Diagnostics.ReportNotAFunction(identifierToken.Location, name);
+                    return null;
+            }
         }
 
         private VariableSymbol? BindVariableReference(SyntaxToken identifierToken)

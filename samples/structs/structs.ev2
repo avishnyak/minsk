@@ -13,6 +13,11 @@ function Point.double()
     print("Point.double")
 }
 
+function Point.scale(factor: int)
+{
+    print("Scale")
+}
+
 struct Line
 {
     var start: Point
@@ -57,4 +62,9 @@ function main()
     p1.y -= 1
     print("p1.x: " + string(p1.x))
     print("p1.y: " + string(p1.y))
+
+    // Call functions attached to a struct instance
+    p1.double()
+    p1.scale(2)
+    nested.start.double()
 }

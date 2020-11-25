@@ -938,29 +938,54 @@ namespace EV2.CodeAnalysis.Emit
                 return;
             }
 
-            foreach (var argument in node.Arguments)
-                EmitExpression(ilProcessor, argument);
+            if (node.Instance != null)
+            {
+                var methodDefinition = _methods[node.Function];
 
-            if (node.Function == BuiltinFunctions.Input)
-            {
-                ilProcessor.Emit(OpCodes.Call, _consoleReadLineReference);
-            }
-            else if (node.Function == BuiltinFunctions.Print)
-            {
-                ilProcessor.Emit(OpCodes.Call, _consoleWriteLineReference);
-            }
-            else if (node.Function.Name.EndsWith(".ctor"))
-            {
-                var className = node.Function.Name[..^5];
-                var @struct = _structs.First(s => s.Key.Name == className).Value;
+                if (node.Instance is BoundVariableExpression variable)
+                {
+                    EmitVariableExpression(ilProcessor, variable);
+                }
+                else if (node.Instance is BoundFieldAccessExpression field)
+                {
+                    EmitFieldAccessExpression(ilProcessor, field);
+                }
+                else
+                {
+                    throw new Exception("Unexpected node type in call expression");
+                }
 
-                // TODO: Use a general overload resolution algorithm instead
-                ilProcessor.Emit(OpCodes.Newobj, node.Arguments.Length == 0 ? @struct.Methods[0] : @struct.Methods[1]);
+                foreach (var argument in node.Arguments)
+                    EmitExpression(ilProcessor, argument);
+
+                ilProcessor.Emit(OpCodes.Callvirt, methodDefinition);
             }
             else
             {
-                var methodDefinition = _methods[node.Function];
-                ilProcessor.Emit(OpCodes.Call, methodDefinition);
+                foreach (var argument in node.Arguments)
+                    EmitExpression(ilProcessor, argument);
+
+                if (node.Function == BuiltinFunctions.Input)
+                {
+                    ilProcessor.Emit(OpCodes.Call, _consoleReadLineReference);
+                }
+                else if (node.Function == BuiltinFunctions.Print)
+                {
+                    ilProcessor.Emit(OpCodes.Call, _consoleWriteLineReference);
+                }
+                else if (node.Function.Name.EndsWith(".ctor"))
+                {
+                    var className = node.Function.Name[..^5];
+                    var @struct = _structs.First(s => s.Key.Name == className).Value;
+
+                    // TODO: Use a general overload resolution algorithm instead
+                    ilProcessor.Emit(OpCodes.Newobj, node.Arguments.Length == 0 ? @struct.Methods[0] : @struct.Methods[1]);
+                }
+                else
+                {
+                    var methodDefinition = _methods[node.Function];
+                    ilProcessor.Emit(OpCodes.Call, methodDefinition);
+                }
             }
         }
 

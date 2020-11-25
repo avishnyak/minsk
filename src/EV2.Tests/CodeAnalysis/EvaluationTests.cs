@@ -635,11 +635,12 @@ namespace EV2.Tests.CodeAnalysis
             const string? text = @"
                 var p: int = 0
 
-                print([p].[length])
+                print([p].[[length]])
             ";
 
             const string? diagnostics = @"
                 'p' is not a struct.
+                'length' is not a function.
                 Cannot access members of 'p'. Only members of structs can be accessed using the '.' operator.
             ";
 

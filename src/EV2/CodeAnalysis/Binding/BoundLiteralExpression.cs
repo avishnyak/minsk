@@ -6,7 +6,7 @@ namespace EV2.CodeAnalysis.Binding
 {
     internal sealed class BoundLiteralExpression : BoundExpression
     {
-        public BoundLiteralExpression(SyntaxNode syntax, object value)
+        public BoundLiteralExpression(SyntaxNode syntax, object? value)
             : base(syntax)
         {
             if (value is bool)

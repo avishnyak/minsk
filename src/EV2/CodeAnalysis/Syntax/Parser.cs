@@ -521,19 +521,26 @@ namespace EV2.CodeAnalysis.Syntax
 
         private ExpressionSyntax ParseNameOrCallExpression(bool withSuffix = false)
         {
-            if (Peek(0).Kind == SyntaxKind.IdentifierToken && Peek(1).Kind == SyntaxKind.OpenParenthesisToken)
-                return ParseCallExpression();
+            var identifier = ParseNameExpression(withSuffix);
 
-            return ParseNameExpression(withSuffix);
+            if (Peek(0).Kind == SyntaxKind.OpenParenthesisToken)
+                return ParseCallExpression(identifier);
+
+            return identifier;
         }
 
-        private ExpressionSyntax ParseCallExpression()
+        private ExpressionSyntax ParseCallExpression(ExpressionSyntax identifier)
         {
-            var identifier = MatchToken(SyntaxKind.IdentifierToken);
             var openParenthesisToken = MatchToken(SyntaxKind.OpenParenthesisToken);
             var arguments = ParseArguments();
             var closeParenthesisToken = MatchToken(SyntaxKind.CloseParenthesisToken);
-            return new CallExpressionSyntax(_syntaxTree, identifier, openParenthesisToken, arguments, closeParenthesisToken);
+
+            return identifier switch
+            {
+                NameExpressionSyntax id => new CallExpressionSyntax(_syntaxTree, id, openParenthesisToken, arguments, closeParenthesisToken),
+                MemberAccessExpressionSyntax id => new CallExpressionSyntax(_syntaxTree, id, openParenthesisToken, arguments, closeParenthesisToken),
+                _ => throw new System.Exception("Unexpected expression kind.")
+            };
         }
 
         private SeparatedSyntaxList<ExpressionSyntax> ParseArguments()

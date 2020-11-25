@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Net;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 
