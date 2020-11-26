@@ -62,6 +62,7 @@ namespace EV2.CodeAnalysis.Syntax
         LetKeyword,
         ReturnKeyword,
         StructKeyword,
+        ThisKeyword,
         ToKeyword,
         TrueKeyword,
         VarKeyword,

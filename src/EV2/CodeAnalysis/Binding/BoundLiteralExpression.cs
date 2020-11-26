@@ -25,7 +25,7 @@ namespace EV2.CodeAnalysis.Binding
 
         public override BoundNodeKind Kind => BoundNodeKind.LiteralExpression;
         public override TypeSymbol Type { get; }
-        public object Value => ConstantValue.Value;
+        public object? Value => ConstantValue.Value;
         public override BoundConstant ConstantValue { get; }
     }
 }

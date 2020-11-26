@@ -14,7 +14,7 @@ namespace EV2.CodeAnalysis.Binding
     {
         private readonly FunctionSymbol? _function;
 
-        private Stack<(BoundLabel BreakLabel, BoundLabel ContinueLabel)> _loopStack = new Stack<(BoundLabel BreakLabel, BoundLabel ContinueLabel)>();
+        private readonly Stack<(BoundLabel BreakLabel, BoundLabel ContinueLabel)> _loopStack = new Stack<(BoundLabel BreakLabel, BoundLabel ContinueLabel)>();
         private int _labelCounter;
         private BoundScope _scope;
 
@@ -38,6 +38,7 @@ namespace EV2.CodeAnalysis.Binding
             binder.Diagnostics.AddRange(syntaxTrees.SelectMany(st => st.Diagnostics));
 
             if (binder.Diagnostics.Any())
+            {
                 return new BoundGlobalScope(
                     previous,
                     binder.Diagnostics.ToImmutableArray(),
@@ -47,6 +48,7 @@ namespace EV2.CodeAnalysis.Binding
                     ImmutableArray<FunctionSymbol>.Empty,
                     ImmutableArray<VariableSymbol>.Empty,
                     ImmutableArray<BoundStatement>.Empty);
+            }
 
             // Phase 1: Forward declare structs
             var structDeclarations = syntaxTrees.SelectMany(st => st.Root.Members)
@@ -98,7 +100,9 @@ namespace EV2.CodeAnalysis.Binding
             if (mainFunction != null)
             {
                 if (mainFunction.ReturnType != TypeSymbol.Void || mainFunction.Parameters.Any())
+                {
                     binder.Diagnostics.ReportMainMustHaveCorrectSignature(mainFunction.Declaration!.Identifier.Location);
+                }
             }
 
             if (globalStatements.Any())
@@ -121,7 +125,9 @@ namespace EV2.CodeAnalysis.Binding
             var structs = binder._scope.GetDeclaredStructs();
 
             if (previous != null)
+            {
                 diagnostics = diagnostics.InsertRange(0, previous.Diagnostics);
+            }
 
             return new BoundGlobalScope(previous, diagnostics, mainFunction, scriptFunction, structs, functions, variables, statements.ToImmutable());
         }
@@ -131,6 +137,7 @@ namespace EV2.CodeAnalysis.Binding
             var parentScope = CreateParentScope(globalScope);
 
             if (globalScope.Diagnostics.Any())
+            {
                 return new BoundProgram(
                     previous,
                     globalScope.Diagnostics,
@@ -138,6 +145,7 @@ namespace EV2.CodeAnalysis.Binding
                     null,
                     ImmutableDictionary<FunctionSymbol, BoundBlockStatement>.Empty,
                     ImmutableDictionary<StructSymbol, BoundBlockStatement>.Empty);
+            }
 
             var functionBodies = ImmutableDictionary.CreateBuilder<FunctionSymbol, BoundBlockStatement>();
             var structBodies = ImmutableDictionary.CreateBuilder<StructSymbol, BoundBlockStatement>();
@@ -160,14 +168,16 @@ namespace EV2.CodeAnalysis.Binding
                 // We will skip attempting to lower the bodies for these and allow the Emitter to automatically
                 // generate the code necessary.  This will avoid the potential of reporting diagnostic errors to
                 // the user for code they never wrote.
-                if (function.ReturnType is StructSymbol) { continue;  }
+                if (function.ReturnType is StructSymbol) { continue; }
 
                 var binder = new Binder(parentScope, function);
                 var body = binder.BindStatement(function.Declaration!.Body);
                 var loweredBody = Lowerer.Lower(function, body);
 
                 if (function.ReturnType != TypeSymbol.Void && !ControlFlowGraph.AllPathsReturn(loweredBody))
+                {
                     binder.Diagnostics.ReportAllPathsMustReturn(function.Declaration.Identifier.Location);
+                }
 
                 functionBodies.Add(function, loweredBody);
 
@@ -175,7 +185,7 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             var compilationUnit = globalScope.Statements.Any()
-                                    ? globalScope.Statements.First().Syntax.AncestorsAndSelf().LastOrDefault()
+                                    ? globalScope.Statements[0].Syntax.AncestorsAndSelf().LastOrDefault()
                                     : null;
 
             if (globalScope.MainFunction != null && globalScope.Statements.Any())
@@ -224,7 +234,9 @@ namespace EV2.CodeAnalysis.Binding
                 var decl = BindVariableDeclaration(varDeclarationSyntax);
 
                 if (decl is BoundVariableDeclaration d)
+                {
                     boundMembers.Add(d.Variable);
+                }
 
                 if (varDeclarationSyntax.Keyword.Kind == SyntaxKind.LetKeyword)
                 {
@@ -245,7 +257,7 @@ namespace EV2.CodeAnalysis.Binding
                     // done later in the BindMemberBlockStatement
                     continue;
                 }
-                
+
                 var parameter = new ParameterSymbol(parameterName, parameterType, ctorParameters.Count);
 
                 ctorParameters.Add(parameter);
@@ -348,7 +360,7 @@ namespace EV2.CodeAnalysis.Binding
 
         public DiagnosticBag Diagnostics { get; } = new DiagnosticBag();
 
-        private BoundStatement BindErrorStatement(SyntaxNode syntax)
+        private static BoundStatement BindErrorStatement(SyntaxNode syntax)
         {
             return new BoundExpressionStatement(syntax, new BoundErrorExpression(syntax));
         }
@@ -374,7 +386,9 @@ namespace EV2.CodeAnalysis.Binding
                                               es.Expression.Kind == BoundNodeKind.CompoundFieldAssignmentExpression;
 
                     if (!isAllowedExpression)
+                    {
                         Diagnostics.ReportInvalidExpressionStatement(syntax.Location);
+                    }
                 }
             }
 
@@ -402,31 +416,20 @@ namespace EV2.CodeAnalysis.Binding
 
         private BoundStatement BindStatementInternal(StatementSyntax syntax)
         {
-            switch (syntax.Kind)
+            return syntax.Kind switch
             {
-                case SyntaxKind.BlockStatement:
-                    return BindBlockStatement((BlockStatementSyntax)syntax);
-                case SyntaxKind.VariableDeclaration:
-                    return BindVariableDeclaration((VariableDeclarationSyntax)syntax);
-                case SyntaxKind.IfStatement:
-                    return BindIfStatement((IfStatementSyntax)syntax);
-                case SyntaxKind.WhileStatement:
-                    return BindWhileStatement((WhileStatementSyntax)syntax);
-                case SyntaxKind.DoWhileStatement:
-                    return BindDoWhileStatement((DoWhileStatementSyntax)syntax);
-                case SyntaxKind.ForStatement:
-                    return BindForStatement((ForStatementSyntax)syntax);
-                case SyntaxKind.BreakStatement:
-                    return BindBreakStatement((BreakStatementSyntax)syntax);
-                case SyntaxKind.ContinueStatement:
-                    return BindContinueStatement((ContinueStatementSyntax)syntax);
-                case SyntaxKind.ReturnStatement:
-                    return BindReturnStatement((ReturnStatementSyntax)syntax);
-                case SyntaxKind.ExpressionStatement:
-                    return BindExpressionStatement((ExpressionStatementSyntax)syntax);
-                default:
-                    throw new Exception($"Unexpected syntax {syntax.Kind}");
-            }
+                SyntaxKind.BlockStatement => BindBlockStatement((BlockStatementSyntax)syntax),
+                SyntaxKind.VariableDeclaration => BindVariableDeclaration((VariableDeclarationSyntax)syntax),
+                SyntaxKind.IfStatement => BindIfStatement((IfStatementSyntax)syntax),
+                SyntaxKind.WhileStatement => BindWhileStatement((WhileStatementSyntax)syntax),
+                SyntaxKind.DoWhileStatement => BindDoWhileStatement((DoWhileStatementSyntax)syntax),
+                SyntaxKind.ForStatement => BindForStatement((ForStatementSyntax)syntax),
+                SyntaxKind.BreakStatement => BindBreakStatement((BreakStatementSyntax)syntax),
+                SyntaxKind.ContinueStatement => BindContinueStatement((ContinueStatementSyntax)syntax),
+                SyntaxKind.ReturnStatement => BindReturnStatement((ReturnStatementSyntax)syntax),
+                SyntaxKind.ExpressionStatement => BindExpressionStatement((ExpressionStatementSyntax)syntax),
+                _ => throw new Exception($"Unexpected syntax {syntax.Kind}"),
+            };
         }
 
         private BoundStatement BindBlockStatement(BlockStatementSyntax syntax)
@@ -490,12 +493,16 @@ namespace EV2.CodeAnalysis.Binding
         private BoundExpression? BindDefaultExpression(DefaultKeywordSyntax syntax, TypeClauseSyntax? typeSyntax)
         {
             if (typeSyntax == null)
+            {
                 return null;
+            }
 
             var type = LookupType(typeSyntax.Identifier.Text);
 
             if (type == null)
+            {
                 Diagnostics.ReportUndefinedType(typeSyntax.Identifier.Location, typeSyntax.Identifier.Text);
+            }
 
             if (type is StructSymbol s)
             {
@@ -513,12 +520,16 @@ namespace EV2.CodeAnalysis.Binding
         private TypeSymbol? BindTypeClause(TypeClauseSyntax? syntax)
         {
             if (syntax == null)
+            {
                 return null;
+            }
 
             var type = LookupType(syntax.Identifier.Text);
 
             if (type == null)
+            {
                 Diagnostics.ReportUndefinedType(syntax.Identifier.Location, syntax.Identifier.Text);
+            }
 
             return type;
         }
@@ -526,12 +537,16 @@ namespace EV2.CodeAnalysis.Binding
         private TypeSymbol? BindTypeClause(SyntaxToken? identifier)
         {
             if (identifier == null || string.IsNullOrWhiteSpace(identifier.Text))
+            {
                 return null;
+            }
 
             var type = LookupType(identifier.Text);
 
             if (type == null)
+            {
                 Diagnostics.ReportUndefinedType(identifier.Location, identifier.Text);
+            }
 
             return type;
         }
@@ -543,9 +558,13 @@ namespace EV2.CodeAnalysis.Binding
             if (condition.ConstantValue != null)
             {
                 if ((bool)condition.ConstantValue.Value == false)
+                {
                     Diagnostics.ReportUnreachableCode(syntax.ThenStatement);
+                }
                 else if (syntax.ElseClause != null)
+                {
                     Diagnostics.ReportUnreachableCode(syntax.ElseClause.ElseStatement);
+                }
             }
 
             var thenStatement = BindStatement(syntax.ThenStatement);
@@ -645,12 +664,16 @@ namespace EV2.CodeAnalysis.Binding
                 if (_function.ReturnType == TypeSymbol.Void)
                 {
                     if (expression != null)
+                    {
                         Diagnostics.ReportInvalidReturnExpression(syntax.Expression!.Location, _function.Name);
+                    }
                 }
                 else
                 {
                     if (expression == null)
+                    {
                         Diagnostics.ReportMissingReturnExpression(syntax.ReturnKeyword.Location, _function.ReturnType);
+                    }
                     else
                         expression = BindConversion(syntax.Expression!.Location, expression, _function.ReturnType);
                 }
@@ -684,27 +707,18 @@ namespace EV2.CodeAnalysis.Binding
 
         private BoundExpression BindExpressionInternal(ExpressionSyntax syntax)
         {
-            switch (syntax.Kind)
+            return syntax.Kind switch
             {
-                case SyntaxKind.ParenthesizedExpression:
-                    return BindParenthesizedExpression((ParenthesizedExpressionSyntax)syntax);
-                case SyntaxKind.LiteralExpression:
-                    return BindLiteralExpression((LiteralExpressionSyntax)syntax);
-                case SyntaxKind.NameExpression:
-                    return BindNameExpression((NameExpressionSyntax)syntax);
-                case SyntaxKind.AssignmentExpression:
-                    return BindAssignmentExpression((AssignmentExpressionSyntax)syntax);
-                case SyntaxKind.UnaryExpression:
-                    return BindUnaryExpression((UnaryExpressionSyntax)syntax);
-                case SyntaxKind.BinaryExpression:
-                    return BindBinaryExpression((BinaryExpressionSyntax)syntax);
-                case SyntaxKind.CallExpression:
-                    return BindCallExpression((CallExpressionSyntax)syntax);
-                case SyntaxKind.MemberAccessExpression:
-                    return BindMemberAccessExpression((MemberAccessExpressionSyntax)syntax);
-                default:
-                    throw new Exception($"Unexpected syntax {syntax.Kind}");
-            }
+                SyntaxKind.ParenthesizedExpression => BindParenthesizedExpression((ParenthesizedExpressionSyntax)syntax),
+                SyntaxKind.LiteralExpression => BindLiteralExpression((LiteralExpressionSyntax)syntax),
+                SyntaxKind.NameExpression => BindNameExpression((NameExpressionSyntax)syntax),
+                SyntaxKind.AssignmentExpression => BindAssignmentExpression((AssignmentExpressionSyntax)syntax),
+                SyntaxKind.UnaryExpression => BindUnaryExpression((UnaryExpressionSyntax)syntax),
+                SyntaxKind.BinaryExpression => BindBinaryExpression((BinaryExpressionSyntax)syntax),
+                SyntaxKind.CallExpression => BindCallExpression((CallExpressionSyntax)syntax),
+                SyntaxKind.MemberAccessExpression => BindMemberAccessExpression((MemberAccessExpressionSyntax)syntax),
+                _ => throw new Exception($"Unexpected syntax {syntax.Kind}"),
+            };
         }
 
         private BoundExpression BindParenthesizedExpression(ParenthesizedExpressionSyntax syntax)
@@ -712,7 +726,7 @@ namespace EV2.CodeAnalysis.Binding
             return BindExpression(syntax.Expression);
         }
 
-        private BoundExpression BindLiteralExpression(LiteralExpressionSyntax syntax)
+        private static BoundExpression BindLiteralExpression(LiteralExpressionSyntax syntax)
         {
             var value = syntax.Value ?? 0;
             return new BoundLiteralExpression(syntax, value);
@@ -730,7 +744,9 @@ namespace EV2.CodeAnalysis.Binding
             var variable = BindVariableReference(syntax.IdentifierToken);
 
             if (variable == null)
+            {
                 return new BoundErrorExpression(syntax);
+            }
 
             return new BoundVariableExpression(syntax, variable);
         }
@@ -743,10 +759,14 @@ namespace EV2.CodeAnalysis.Binding
             var variable = BindVariableReference(syntax.IdentifierToken);
 
             if (variable == null)
+            {
                 return boundExpression;
+            }
 
             if (variable.IsReadOnly)
+            {
                 Diagnostics.ReportCannotAssign(syntax.AssignmentToken.Location, name);
+            }
 
             if (syntax.AssignmentToken.Kind != SyntaxKind.EqualsToken)
             {
@@ -774,7 +794,9 @@ namespace EV2.CodeAnalysis.Binding
             var boundOperand = BindExpression(syntax.Operand);
 
             if (boundOperand.Type == TypeSymbol.Error)
+            {
                 return new BoundErrorExpression(syntax);
+            }
 
             var boundOperator = BoundUnaryOperator.Bind(syntax.OperatorToken.Kind, boundOperand.Type);
 
@@ -793,14 +815,18 @@ namespace EV2.CodeAnalysis.Binding
             var boundRight = BindExpression(syntax.Right);
 
             if (boundLeft.Type == TypeSymbol.Error || boundRight.Type == TypeSymbol.Error)
+            {
                 return new BoundErrorExpression(syntax);
+            }
 
             if (syntax.OperatorToken.Kind.IsAssignmentOperator())
             {
                 if (boundLeft is BoundVariableExpression variable)
                 {
                     if (variable.Variable.IsReadOnly)
+                    {
                         Diagnostics.ReportCannotAssign(syntax.OperatorToken.Location, variable.Variable.Name);
+                    }
 
                     if (syntax.OperatorToken.Kind != SyntaxKind.EqualsToken)
                     {
@@ -826,7 +852,9 @@ namespace EV2.CodeAnalysis.Binding
                 if (boundLeft is BoundFieldAccessExpression field)
                 {
                     if (field.StructMember.IsReadOnly)
+                    {
                         Diagnostics.ReportCannotAssign(syntax.OperatorToken.Location, field.StructMember.Name);
+                    }
 
                     if (syntax.OperatorToken.Kind != SyntaxKind.EqualsToken)
                     {
@@ -872,7 +900,9 @@ namespace EV2.CodeAnalysis.Binding
             var type = LookupType(syntax.Identifier.Text);
 
             if (syntax.Arguments.Count == 1 && !(type is StructSymbol) && type is TypeSymbol t)
+            {
                 return BindConversion(syntax.Arguments[0], t, allowExplicit: true);
+            }
 
             var boundArguments = ImmutableArray.CreateBuilder<BoundExpression>();
 
@@ -910,10 +940,12 @@ namespace EV2.CodeAnalysis.Binding
                 {
                     SyntaxNode firstExceedingNode;
                     if (function.Parameters.Length > 0)
+                    {
                         firstExceedingNode = syntax.Arguments.GetSeparator(function.Parameters.Length - 1);
+                    }
                     else
                         firstExceedingNode = syntax.Arguments[0];
-                    var lastExceedingArgument = syntax.Arguments[syntax.Arguments.Count - 1];
+                    var lastExceedingArgument = syntax.Arguments[^1];
                     span = TextSpan.FromBounds(firstExceedingNode.Span.Start, lastExceedingArgument.Span.End);
                 }
                 else
@@ -963,16 +995,17 @@ namespace EV2.CodeAnalysis.Binding
                 {
                     BoundVariableExpression i => new BoundCallExpression(syntax, i, function, boundArguments.ToImmutable()),
                     BoundFieldAccessExpression i => new BoundCallExpression(syntax, i, function, boundArguments.ToImmutable()),
+                    BoundThisExpression i => new BoundCallExpression(syntax, i, function, boundArguments.ToImmutable()),
                     _ => new BoundErrorExpression(syntax)
                 };
             }
             else
             {
-                    return new BoundCallExpression(syntax, function, boundArguments.ToImmutable());
+                return new BoundCallExpression(syntax, function, boundArguments.ToImmutable());
             }
         }
 
-        private bool MatchArgumentsAndParameters(ImmutableArray<BoundExpression> arguments, ImmutableArray<ParameterSymbol> parameters)
+        private static bool MatchArgumentsAndParameters(ImmutableArray<BoundExpression> arguments, ImmutableArray<ParameterSymbol> parameters)
         {
             for (var i = 0; i < arguments.Length; i++)
             {
@@ -993,7 +1026,7 @@ namespace EV2.CodeAnalysis.Binding
         {
             if (syntax.Expression.Kind == SyntaxKind.NameExpression)
             {
-                if (!(BindExpression(syntax.Expression) is BoundVariableExpression expr))
+                if (BindExpression(syntax.Expression) is not BoundVariableExpression expr)
                 {
                     Diagnostics.ReportNotAStruct(syntax.Expression.Location, syntax.Expression.ToString());
                     return new BoundErrorExpression(syntax);
@@ -1018,7 +1051,7 @@ namespace EV2.CodeAnalysis.Binding
             }
             else if (syntax.Expression.Kind == SyntaxKind.MemberAccessExpression)
             {
-                if (!(BindExpression(syntax.Expression) is BoundFieldAccessExpression expr))
+                if (BindExpression(syntax.Expression) is not BoundFieldAccessExpression expr)
                 {
                     Diagnostics.ReportNotAStruct(syntax.Expression.Location, syntax.Expression.ToString());
                     return new BoundErrorExpression(syntax);
@@ -1041,6 +1074,46 @@ namespace EV2.CodeAnalysis.Binding
                 Diagnostics.ReportCannotAccessMember(syntax.IdentifierToken.Location, ((MemberAccessExpressionSyntax)syntax.Expression).IdentifierToken.Text);
                 return new BoundErrorExpression(syntax);
             }
+            else if (syntax.Expression.Kind == SyntaxKind.ThisKeyword)
+            {
+                if (_function == null)
+                {
+                    Diagnostics.ReportCannotUseThisOutsideOfAFunction(syntax.Expression.Location);
+                    return new BoundErrorExpression(syntax);
+                }
+
+                if (_function.Receiver == null)
+                {
+                    Diagnostics.ReportCannotUseThisOutsideOfReceiverFunctions(syntax.Expression.Location, _function.Name);
+                    return new BoundErrorExpression(syntax);
+                }
+
+                // Check if the struct has a member with the name of memberIdentifier
+                VariableSymbol? variable = null;
+
+                foreach (var member in _function.Receiver.Members)
+                {
+                    if (member.Name == syntax.IdentifierToken.Text)
+                    {
+                          variable = member;
+                    }
+                }
+
+                if (variable != null)
+                {
+                    return new BoundFieldAccessExpression(syntax, new BoundThisExpression(syntax.Expression, _function.Receiver), variable);
+                }
+
+                var func = BindFunctionReference(syntax.IdentifierToken);
+
+                if (func != null)
+                {
+                    return new BoundThisExpression(syntax.Expression, _function.Receiver);
+                }
+
+                Diagnostics.ReportUndefinedStructField(syntax.IdentifierToken.Location, syntax.IdentifierToken.Text);
+                return new BoundErrorExpression(syntax);
+            }
             else
             {
                 Diagnostics.ReportCannotAccessMember(syntax.Expression.Location, syntax.Expression.ToString());
@@ -1061,7 +1134,9 @@ namespace EV2.CodeAnalysis.Binding
             if (!conversion.Exists)
             {
                 if (expression.Type != TypeSymbol.Error && type != TypeSymbol.Error)
+                {
                     Diagnostics.ReportCannotConvert(diagnosticLocation, expression.Type, type);
+                }
 
                 return new BoundErrorExpression(expression.Syntax);
             }
@@ -1072,7 +1147,9 @@ namespace EV2.CodeAnalysis.Binding
             }
 
             if (conversion.IsIdentity)
+            {
                 return expression;
+            }
 
             return new BoundConversionExpression(expression.Syntax, type, expression);
         }
@@ -1082,11 +1159,13 @@ namespace EV2.CodeAnalysis.Binding
             var name = identifier.Text ?? "?";
             var declare = !identifier.IsMissing;
             var variable = _function == null
-                                ? (VariableSymbol) new GlobalVariableSymbol(name, isReadOnly, type, constant)
+                                ? (VariableSymbol)new GlobalVariableSymbol(name, isReadOnly, type, constant)
                                 : new LocalVariableSymbol(name, isReadOnly, type, constant);
 
             if (declare && !_scope.TryDeclareVariable(variable))
+            {
                 Diagnostics.ReportSymbolAlreadyDeclared(identifier.Location, name);
+            }
 
             return variable;
         }
@@ -1166,16 +1245,23 @@ namespace EV2.CodeAnalysis.Binding
             {
                 case "any":
                     return TypeSymbol.Any;
+
                 case "bool":
                     return TypeSymbol.Bool;
+
                 case "int":
                     return TypeSymbol.Int;
+
                 case "string":
                     return TypeSymbol.String;
+
                 default:
                     var maybeSymbol = _scope.TryLookupSymbol(name);
 
-                    if (maybeSymbol is TypeSymbol s) return s;
+                    if (maybeSymbol is TypeSymbol s)
+                    {
+                        return s;
+                    }
 
                     return null;
             }

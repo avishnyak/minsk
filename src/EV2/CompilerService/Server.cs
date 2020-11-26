@@ -40,7 +40,7 @@ namespace EV2.CompilerService
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (tree.Diagnostics.Count() > 0)
+                if (tree.Diagnostics.Length > 0)
                 {
                     _host.PublishDiagnostics(tree.Diagnostics, cancellationToken);
                 }
@@ -53,7 +53,7 @@ namespace EV2.CompilerService
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (diagnostics.Count() > 0)
+                if (diagnostics.Length > 0)
                 {
                     _host.PublishDiagnostics(diagnostics);
                 }
@@ -108,9 +108,9 @@ namespace EV2.CompilerService
 
             foreach (var tree in syntaxTrees)
             {
-                if (tree.Diagnostics.Count() > 0)
+                if (tree.Diagnostics.Length > 0)
                 {
-                    _host.PublishDiagnostics(tree.Diagnostics);
+                    _host.PublishDiagnostics(tree.Diagnostics, cancellationToken);
                 }
             }
 
@@ -131,7 +131,7 @@ namespace EV2.CompilerService
 
             var diagnostics = compilation.Emit(moduleName, referencePaths, outputPath);
 
-            if (diagnostics.Count() > 0)
+            if (diagnostics.Length > 0)
             {
                 _host.PublishDiagnostics(diagnostics);
             }
@@ -140,9 +140,8 @@ namespace EV2.CompilerService
         }
 
         /// <summary>
-        /// Request that the compiler service start it's shutdown routine.
-        ///
-        /// Must be called before Exit
+        /// <para>Request that the compiler service start it's shutdown routine.</para>
+        /// <para>Must be called before Exit</para>
         /// </summary>
         /// <param name="cancellationToken">Cancel shutdown</param>
         /// <returns>Task</returns>

@@ -13,11 +13,11 @@ namespace EV2.Generators
     [Generator]
     public class SyntaxNodeGetChildrenGenerator : ISourceGenerator
     {
-        public void Initialize(InitializationContext context)
+        public void Initialize(GeneratorInitializationContext context)
         {
         }
 
-        public void Execute(SourceGeneratorContext context)
+        public void Execute(GeneratorExecutionContext context)
         {
 #pragma warning disable IDE0063 // Use simple 'using' statement: we want to control when the 'using' varibales go out of scope
             SourceText sourceText;
@@ -34,7 +34,7 @@ namespace EV2.Generators
             var types = GetAllTypes(compilation.Assembly);
             var syntaxNodeTypes = types.Where(t => !t.IsAbstract && IsPartial(t) && IsDerivedFrom(t, syntaxNodeType));
 
-            string indentString = "    ";
+            const string indentString = "    ";
             using (var stringWriter = new StringWriter())
             using (var indentedTextWriter = new IndentedTextWriter(stringWriter, indentString))
             {
@@ -73,7 +73,6 @@ namespace EV2.Generators
                                     {
                                         indentedTextWriter.WriteLine($"foreach (var child in {property.Name})");
                                         indentedTextWriter.WriteLine($"{indentString}yield return child;");
-
                                     }
                                     else if (SymbolEqualityComparer.Default.Equals(propertyType.OriginalDefinition, separatedSyntaxListType) &&
                                              IsDerivedFrom(propertyType.TypeArguments[0], syntaxNodeType))
@@ -93,29 +92,8 @@ namespace EV2.Generators
                 sourceText = SourceText.From(stringWriter.ToString(), Encoding.UTF8);
             }
 
-            var hintName = "SyntaxNode_GetChildren.g.cs";
+            const string hintName = "SyntaxNode_GetChildren.g.cs";
             context.AddSource(hintName, sourceText);
-
-            // HACK
-            //
-            // Make generator work in VS Code. See src\Directory.Build.props for
-            // details.
-
-            var fileName = "SyntaxNode_GetChildren.g.cs";
-            var syntaxNodeFilePath = syntaxNodeType.DeclaringSyntaxReferences.First().SyntaxTree.FilePath;
-            var syntaxDirectory = Path.GetDirectoryName(syntaxNodeFilePath);
-            var filePath = Path.Combine(syntaxDirectory, fileName);
-
-            if (File.Exists(filePath))
-            {
-                var fileText = File.ReadAllText(filePath);
-                var sourceFileText = SourceText.From(fileText, Encoding.UTF8);
-                if (sourceText.ContentEquals(sourceFileText))
-                    return;
-            }
-
-            using (var writer = new StreamWriter(filePath))
-                sourceText.Write(writer);
 #pragma warning restore IDE0063 // Use simple 'using' statement: we want to control when the variable goes out of scope
         }
 
@@ -133,8 +111,12 @@ namespace EV2.Generators
                 result.Add(type);
 
             foreach (var child in symbol.GetMembers())
+            {
                 if (child is INamespaceOrTypeSymbol nsChild)
+                {
                     GetAllTypes(result, nsChild);
+                }
+            }
         }
 
         private bool IsDerivedFrom(ITypeSymbol type, INamedTypeSymbol baseType)

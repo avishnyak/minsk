@@ -7,53 +7,24 @@ namespace EV2.CodeAnalysis.Binding
     {
         public virtual BoundStatement RewriteStatement(BoundStatement node)
         {
-            switch (node.Kind)
+            return node.Kind switch
             {
-                case BoundNodeKind.BlockStatement:
-                    return RewriteBlockStatement((BoundBlockStatement)node);
-
-                case BoundNodeKind.MemberBlockStatement:
-                    return RewriteBlockStatement((BoundMemberBlockStatement)node);
-
-                case BoundNodeKind.NopStatement:
-                    return RewriteNopStatement((BoundNopStatement)node);
-
-                case BoundNodeKind.VariableDeclaration:
-                    return RewriteVariableDeclaration((BoundVariableDeclaration)node);
-
-                case BoundNodeKind.IfStatement:
-                    return RewriteIfStatement((BoundIfStatement)node);
-
-                case BoundNodeKind.WhileStatement:
-                    return RewriteWhileStatement((BoundWhileStatement)node);
-
-                case BoundNodeKind.DoWhileStatement:
-                    return RewriteDoWhileStatement((BoundDoWhileStatement)node);
-
-                case BoundNodeKind.ForStatement:
-                    return RewriteForStatement((BoundForStatement)node);
-
-                case BoundNodeKind.LabelStatement:
-                    return RewriteLabelStatement((BoundLabelStatement)node);
-
-                case BoundNodeKind.GotoStatement:
-                    return RewriteGotoStatement((BoundGotoStatement)node);
-
-                case BoundNodeKind.ConditionalGotoStatement:
-                    return RewriteConditionalGotoStatement((BoundConditionalGotoStatement)node);
-
-                case BoundNodeKind.ReturnStatement:
-                    return RewriteReturnStatement((BoundReturnStatement)node);
-
-                case BoundNodeKind.ExpressionStatement:
-                    return RewriteExpressionStatement((BoundExpressionStatement)node);
-
-                case BoundNodeKind.SequencePointStatement:
-                    return RewriteSequencePointStatement((BoundSequencePointStatement)node);
-
-                default:
-                    throw new Exception($"Unexpected node: {node.Kind}");
-            }
+                BoundNodeKind.BlockStatement => RewriteBlockStatement((BoundBlockStatement)node),
+                BoundNodeKind.ConditionalGotoStatement => RewriteConditionalGotoStatement((BoundConditionalGotoStatement)node),
+                BoundNodeKind.DoWhileStatement => RewriteDoWhileStatement((BoundDoWhileStatement)node),
+                BoundNodeKind.ExpressionStatement => RewriteExpressionStatement((BoundExpressionStatement)node),
+                BoundNodeKind.ForStatement => RewriteForStatement((BoundForStatement)node),
+                BoundNodeKind.GotoStatement => RewriteGotoStatement((BoundGotoStatement)node),
+                BoundNodeKind.IfStatement => RewriteIfStatement((BoundIfStatement)node),
+                BoundNodeKind.LabelStatement => RewriteLabelStatement((BoundLabelStatement)node),
+                BoundNodeKind.MemberBlockStatement => RewriteBlockStatement((BoundMemberBlockStatement)node),
+                BoundNodeKind.NopStatement => RewriteNopStatement((BoundNopStatement)node),
+                BoundNodeKind.ReturnStatement => RewriteReturnStatement((BoundReturnStatement)node),
+                BoundNodeKind.SequencePointStatement => RewriteSequencePointStatement((BoundSequencePointStatement)node),
+                BoundNodeKind.VariableDeclaration => RewriteVariableDeclaration((BoundVariableDeclaration)node),
+                BoundNodeKind.WhileStatement => RewriteWhileStatement((BoundWhileStatement)node),
+                _ => throw new Exception($"Unexpected node: {node.Kind}"),
+            };
         }
 
         protected virtual BoundStatement RewriteBlockStatement(BoundStatement node)
@@ -200,47 +171,28 @@ namespace EV2.CodeAnalysis.Binding
 
         public virtual BoundExpression RewriteExpression(BoundExpression node)
         {
-            switch (node.Kind)
+            return node.Kind switch
             {
-                case BoundNodeKind.ErrorExpression:
-                    return RewriteErrorExpression((BoundErrorExpression)node);
+                BoundNodeKind.AssignmentExpression => RewriteAssignmentExpression((BoundAssignmentExpression)node),
+                BoundNodeKind.BinaryExpression => RewriteBinaryExpression((BoundBinaryExpression)node),
+                BoundNodeKind.CallExpression => RewriteCallExpression((BoundCallExpression)node),
+                BoundNodeKind.CompoundAssignmentExpression => RewriteCompoundAssignmentExpression((BoundCompoundAssignmentExpression)node),
+                BoundNodeKind.CompoundFieldAssignmentExpression => RewriteCompoundFieldAssignmentExpression((BoundCompoundFieldAssignmentExpression)node),
+                BoundNodeKind.ConversionExpression => RewriteConversionExpression((BoundConversionExpression)node),
+                BoundNodeKind.ErrorExpression => RewriteErrorExpression((BoundErrorExpression)node),
+                BoundNodeKind.FieldAccessExpression => RewriteFieldAccessExpression((BoundFieldAccessExpression)node),
+                BoundNodeKind.FieldAssignmentExpression => RewriteFieldAssignmentExpression((BoundFieldAssignmentExpression)node),
+                BoundNodeKind.LiteralExpression => RewriteLiteralExpression((BoundLiteralExpression)node),
+                BoundNodeKind.ThisExpression => RewriteThisExpression((BoundThisExpression)node),
+                BoundNodeKind.UnaryExpression => RewriteUnaryExpression((BoundUnaryExpression)node),
+                BoundNodeKind.VariableExpression => RewriteVariableExpression((BoundVariableExpression)node),
+                _ => throw new Exception($"Unexpected node: {node.Kind}"),
+            };
+        }
 
-                case BoundNodeKind.LiteralExpression:
-                    return RewriteLiteralExpression((BoundLiteralExpression)node);
-
-                case BoundNodeKind.VariableExpression:
-                    return RewriteVariableExpression((BoundVariableExpression)node);
-
-                case BoundNodeKind.AssignmentExpression:
-                    return RewriteAssignmentExpression((BoundAssignmentExpression)node);
-
-                case BoundNodeKind.CompoundAssignmentExpression:
-                    return RewriteCompoundAssignmentExpression((BoundCompoundAssignmentExpression)node);
-
-                case BoundNodeKind.UnaryExpression:
-                    return RewriteUnaryExpression((BoundUnaryExpression)node);
-
-                case BoundNodeKind.BinaryExpression:
-                    return RewriteBinaryExpression((BoundBinaryExpression)node);
-
-                case BoundNodeKind.CallExpression:
-                    return RewriteCallExpression((BoundCallExpression)node);
-
-                case BoundNodeKind.ConversionExpression:
-                    return RewriteConversionExpression((BoundConversionExpression)node);
-
-                case BoundNodeKind.FieldAccessExpression:
-                    return RewriteFieldAccessExpression((BoundFieldAccessExpression)node);
-
-                case BoundNodeKind.FieldAssignmentExpression:
-                    return RewriteFieldAssignmentExpression((BoundFieldAssignmentExpression)node);
-
-                case BoundNodeKind.CompoundFieldAssignmentExpression:
-                    return RewriteCompoundFieldAssignmentExpression((BoundCompoundFieldAssignmentExpression)node);
-
-                default:
-                    throw new Exception($"Unexpected node: {node.Kind}");
-            }
+        private BoundExpression RewriteThisExpression(BoundThisExpression node)
+        {
+            return node;
         }
 
         protected virtual BoundExpression RewriteCompoundFieldAssignmentExpression(BoundCompoundFieldAssignmentExpression node)
@@ -351,8 +303,7 @@ namespace EV2.CodeAnalysis.Binding
                     }
                 }
 
-                if (builder != null)
-                    builder.Add(newArgument);
+                builder?.Add(newArgument);
             }
 
             if (builder == null)

@@ -25,6 +25,12 @@ namespace EV2.CodeAnalysis.Binding
             Instance = instance;
         }
 
+        public BoundCallExpression(SyntaxNode syntax, BoundThisExpression instance, FunctionSymbol function, ImmutableArray<BoundExpression> arguments)
+            :this (syntax, function, arguments)
+        {
+            Instance = instance;
+        }
+
         public override BoundNodeKind Kind => BoundNodeKind.CallExpression;
         public override TypeSymbol Type => Function.ReturnType;
         public BoundExpression? Instance { get; }

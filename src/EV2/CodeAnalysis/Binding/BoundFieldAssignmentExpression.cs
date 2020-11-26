@@ -1,10 +1,9 @@
-﻿using System;
+using System;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 
 namespace EV2.CodeAnalysis.Binding
 {
-
     internal sealed class BoundFieldAssignmentExpression : BoundExpression
     {
         public BoundFieldAssignmentExpression(SyntaxNode syntax, BoundExpression structInstance, VariableSymbol structMember, BoundExpression expression)

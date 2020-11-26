@@ -8,7 +8,6 @@ namespace EV2.CodeAnalysis.Syntax
 {
     internal sealed class Lexer
     {
-        private readonly DiagnosticBag _diagnostics = new DiagnosticBag();
         private readonly SyntaxTree _syntaxTree;
         private readonly SourceText _text;
         private int _position;
@@ -16,7 +15,7 @@ namespace EV2.CodeAnalysis.Syntax
         private int _start;
         private SyntaxKind _kind;
         private object? _value;
-        private ImmutableArray<SyntaxTrivia>.Builder _triviaBuilder = ImmutableArray.CreateBuilder<SyntaxTrivia>();
+        private readonly ImmutableArray<SyntaxTrivia>.Builder _triviaBuilder = ImmutableArray.CreateBuilder<SyntaxTrivia>();
 
         public Lexer(SyntaxTree syntaxTree)
         {
@@ -24,7 +23,7 @@ namespace EV2.CodeAnalysis.Syntax
             _text = syntaxTree.Text;
         }
 
-        public DiagnosticBag Diagnostics => _diagnostics;
+        public DiagnosticBag Diagnostics { get; } = new DiagnosticBag();
 
         private char Current => Peek(0);
 
@@ -162,7 +161,6 @@ namespace EV2.CodeAnalysis.Syntax
             _kind = SyntaxKind.WhitespaceTrivia;
         }
 
-
         private void ReadSingleLineComment()
         {
             _position += 2;
@@ -198,7 +196,7 @@ namespace EV2.CodeAnalysis.Syntax
                     case '\0':
                         var span = new TextSpan(_start, 2);
                         var location = new TextLocation(_text, span);
-                        _diagnostics.ReportUnterminatedMultiLineComment(location);
+                        Diagnostics.ReportUnterminatedMultiLineComment(location);
                         done = true;
                         break;
                     case '*':
@@ -422,7 +420,7 @@ namespace EV2.CodeAnalysis.Syntax
                     {
                         var span = new TextSpan(_position, 1);
                         var location = new TextLocation(_text, span);
-                        _diagnostics.ReportBadCharacter(location, Current);
+                        Diagnostics.ReportBadCharacter(location, Current);
                         _position++;
                     }
                     break;
@@ -446,7 +444,7 @@ namespace EV2.CodeAnalysis.Syntax
                     case '\n':
                         var span = new TextSpan(_start, 1);
                         var location = new TextLocation(_text, span);
-                        _diagnostics.ReportUnterminatedString(location);
+                        Diagnostics.ReportUnterminatedString(location);
                         done = true;
                         break;
                     case '"':
@@ -483,7 +481,7 @@ namespace EV2.CodeAnalysis.Syntax
             {
                 var span = new TextSpan(_start, length);
                 var location = new TextLocation(_text, span);
-                _diagnostics.ReportInvalidNumber(location, text, TypeSymbol.Int);
+                Diagnostics.ReportInvalidNumber(location, text, TypeSymbol.Int);
             }
 
             _value = value;

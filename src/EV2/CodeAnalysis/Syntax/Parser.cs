@@ -6,7 +6,6 @@ namespace EV2.CodeAnalysis.Syntax
 {
     internal sealed class Parser
     {
-        private readonly DiagnosticBag _diagnostics = new DiagnosticBag();
         private readonly SyntaxTree _syntaxTree;
         private readonly SourceText _text;
         private readonly ImmutableArray<SyntaxToken> _tokens;
@@ -57,16 +56,16 @@ namespace EV2.CodeAnalysis.Syntax
             _syntaxTree = syntaxTree;
             _text = syntaxTree.Text;
             _tokens = tokens.ToImmutableArray();
-            _diagnostics.AddRange(lexer.Diagnostics);
+            Diagnostics.AddRange(lexer.Diagnostics);
         }
 
-        public DiagnosticBag Diagnostics => _diagnostics;
+        public DiagnosticBag Diagnostics { get; } = new DiagnosticBag();
 
         private SyntaxToken Peek(int offset)
         {
             var index = _position + offset;
             if (index >= _tokens.Length)
-                return _tokens[_tokens.Length - 1];
+                return _tokens[^1];
 
             return _tokens[index];
         }
@@ -85,8 +84,17 @@ namespace EV2.CodeAnalysis.Syntax
             if (Current.Kind == kind)
                 return NextToken();
 
-            _diagnostics.ReportUnexpectedToken(Current.Location, Current.Kind, kind);
+            Diagnostics.ReportUnexpectedToken(Current.Location, Current.Kind, kind);
             return new SyntaxToken(_syntaxTree, kind, Current.Position, null, null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
+        }
+
+        private SyntaxToken MatchToken(SyntaxKind kind1, SyntaxKind kind2)
+        {
+            if (Current.Kind == kind1 || Current.Kind == kind2)
+                return NextToken();
+
+            Diagnostics.ReportUnexpectedToken(Current.Location, Current.Kind, kind1);
+            return new SyntaxToken(_syntaxTree, kind1, Current.Position, null, null, ImmutableArray<SyntaxTrivia>.Empty, ImmutableArray<SyntaxTrivia>.Empty);
         }
 
         public CompilationUnitSyntax ParseCompilationUnit()
@@ -203,30 +211,19 @@ namespace EV2.CodeAnalysis.Syntax
 
         private StatementSyntax ParseStatement()
         {
-            switch (Current.Kind)
+            return Current.Kind switch
             {
-                case SyntaxKind.OpenBraceToken:
-                    return ParseBlockStatement();
-                case SyntaxKind.LetKeyword:
-                case SyntaxKind.VarKeyword:
-                    return ParseVariableDeclaration();
-                case SyntaxKind.IfKeyword:
-                    return ParseIfStatement();
-                case SyntaxKind.WhileKeyword:
-                    return ParseWhileStatement();
-                case SyntaxKind.DoKeyword:
-                    return ParseDoWhileStatement();
-                case SyntaxKind.ForKeyword:
-                    return ParseForStatement();
-                case SyntaxKind.BreakKeyword:
-                    return ParseBreakStatement();
-                case SyntaxKind.ContinueKeyword:
-                    return ParseContinueStatement();
-                case SyntaxKind.ReturnKeyword:
-                    return ParseReturnStatement();
-                default:
-                    return ParseExpressionStatement();
-            }
+                SyntaxKind.BreakKeyword => ParseBreakStatement(),
+                SyntaxKind.ContinueKeyword => ParseContinueStatement(),
+                SyntaxKind.DoKeyword => ParseDoWhileStatement(),
+                SyntaxKind.ForKeyword => ParseForStatement(),
+                SyntaxKind.IfKeyword => ParseIfStatement(),
+                SyntaxKind.LetKeyword or SyntaxKind.VarKeyword => ParseVariableDeclaration(),
+                SyntaxKind.OpenBraceToken => ParseBlockStatement(),
+                SyntaxKind.ReturnKeyword => ParseReturnStatement(),
+                SyntaxKind.WhileKeyword => ParseWhileStatement(),
+                _ => ParseExpressionStatement(),
+            };
         }
 
         private BlockStatementSyntax ParseBlockStatement()
@@ -422,7 +419,6 @@ namespace EV2.CodeAnalysis.Syntax
             return ParseBinaryExpression();
         }
 
-
         /// <summary>
         /// UnaryExpr := (Op)? Expr
         /// BinaryExpr := UnaryExpr Op BinaryExpr
@@ -463,27 +459,15 @@ namespace EV2.CodeAnalysis.Syntax
 
         private ExpressionSyntax ParsePrimaryExpression()
         {
-            switch (Current.Kind)
+            return Current.Kind switch
             {
-                case SyntaxKind.OpenParenthesisToken:
-                    return ParseParenthesizedExpression();
-
-                case SyntaxKind.FalseKeyword:
-                case SyntaxKind.TrueKeyword:
-                    return ParseBooleanLiteral();
-
-                case SyntaxKind.NumberToken:
-                    return ParseNumberLiteral();
-
-                case SyntaxKind.StringToken:
-                    return ParseStringLiteral();
-
-                case SyntaxKind.DefaultKeyword:
-                    return ParseDefaultLiteral();
-
-                default:
-                    return ParseNameOrCallExpression(true);
-            }
+                SyntaxKind.DefaultKeyword => ParseDefaultLiteral(),
+                SyntaxKind.FalseKeyword or SyntaxKind.TrueKeyword => ParseBooleanLiteral(),
+                SyntaxKind.NumberToken => ParseNumberLiteral(),
+                SyntaxKind.OpenParenthesisToken => ParseParenthesizedExpression(),
+                SyntaxKind.StringToken => ParseStringLiteral(),
+                _ => ParseNameOrCallExpression(withSuffix: true),
+            };
         }
 
         private ExpressionSyntax ParseDefaultLiteral()
@@ -590,7 +574,7 @@ namespace EV2.CodeAnalysis.Syntax
 
             while (condition)
             {
-                queue.Enqueue(MatchToken(SyntaxKind.IdentifierToken));
+                queue.Enqueue(MatchToken(SyntaxKind.IdentifierToken, SyntaxKind.ThisKeyword));
 
                 if (Current.Kind == SyntaxKind.DotToken)
                 {
@@ -602,7 +586,11 @@ namespace EV2.CodeAnalysis.Syntax
                 }
             }
 
-            var firstChild = new NameExpressionSyntax(_syntaxTree, queue.Dequeue());
+            var firstIdentifier = queue.Dequeue();
+
+            ExpressionSyntax firstChild = firstIdentifier.Kind == SyntaxKind.ThisKeyword
+                ? new ThisKeywordSyntax(_syntaxTree, firstIdentifier)
+                : (ExpressionSyntax)new NameExpressionSyntax(_syntaxTree, firstIdentifier);
 
             return ParseMemberAccessInternal(queue, firstChild);
         }
@@ -610,13 +598,13 @@ namespace EV2.CodeAnalysis.Syntax
         private MemberAccessExpressionSyntax ParseMemberAccessInternal(Queue<SyntaxToken> queue, ExpressionSyntax child)
         {
             // PERF: Change to iteration instead of recursion
-            var operatorToken = queue.Dequeue();
+            var dotToken = queue.Dequeue();
             var identifier = queue.Dequeue();
 
             if (queue.Count > 0)
-                return ParseMemberAccessInternal(queue, new MemberAccessExpressionSyntax(_syntaxTree, child, operatorToken, identifier));
+                return ParseMemberAccessInternal(queue, new MemberAccessExpressionSyntax(_syntaxTree, child, dotToken, identifier));
             else
-                return new MemberAccessExpressionSyntax(_syntaxTree, child, operatorToken, identifier);
+                return new MemberAccessExpressionSyntax(_syntaxTree, child, dotToken, identifier);
         }
     }
 }

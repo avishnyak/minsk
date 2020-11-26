@@ -48,19 +48,25 @@ namespace EV2.CodeAnalysis
 
         public void ReportUnterminatedString(TextLocation location)
         {
-            var message = "Unterminated string literal.";
+            const string? message = "Unterminated string literal.";
             ReportError(location, message);
         }
 
         public void ReportUnterminatedMultiLineComment(TextLocation location)
         {
-            var message = "Unterminated multi-line comment.";
+            const string? message = "Unterminated multi-line comment.";
             ReportError(location, message);
         }
 
         public void ReportUnexpectedToken(TextLocation location, SyntaxKind actualKind, SyntaxKind expectedKind)
         {
             var message = $"Unexpected token <{actualKind}>, expected <{expectedKind}>.";
+            ReportError(location, message);
+        }
+
+        public void ReportUnexpectedToken(TextLocation location, SyntaxKind actualKind, SyntaxKind expectedKind1, SyntaxKind expectedKind2)
+        {
+            var message = $"Unexpected token <{actualKind}>, expected <{expectedKind1}> or <{expectedKind2}>.";
             ReportError(location, message);
         }
 
@@ -79,6 +85,12 @@ namespace EV2.CodeAnalysis
         public void ReportParameterAlreadyDeclared(TextLocation location, string parameterName)
         {
             var message = $"A parameter with the name '{parameterName}' already exists.";
+            ReportError(location, message);
+        }
+
+        public void ReportUndefinedStructField(TextLocation location, string name)
+        {
+            var message = $"Struct field '{name}' doesn't exist.";
             ReportError(location, message);
         }
 
@@ -141,6 +153,17 @@ namespace EV2.CodeAnalysis
             var message = $"'{name}' is not a function.";
             ReportError(location, message);
         }
+        internal void ReportCannotUseThisOutsideOfReceiverFunctions(TextLocation location, string name)
+        {
+            var message = $"This can only be used in functions with a struct receiver.  Function '{name}' has no receiver defined.";
+            ReportError(location, message);
+        }
+
+        internal void ReportCannotUseThisOutsideOfAFunction(TextLocation location)
+        {
+            const string? message = "This can only by used in functions with a struct receiver.";
+            ReportError(location, message);
+        }
 
         public void ReportWrongArgumentCount(TextLocation location, string name, int expectedCount, int actualCount)
         {
@@ -150,7 +173,7 @@ namespace EV2.CodeAnalysis
 
         public void ReportExpressionMustHaveValue(TextLocation location)
         {
-            var message = "Expression must have a value.";
+            const string? message = "Expression must have a value.";
             ReportError(location, message);
         }
 
@@ -162,7 +185,7 @@ namespace EV2.CodeAnalysis
 
         public void ReportAllPathsMustReturn(TextLocation location)
         {
-            var message = "Not all code paths return a value.";
+            const string? message = "Not all code paths return a value.";
             ReportError(location, message);
         }
 
@@ -174,7 +197,7 @@ namespace EV2.CodeAnalysis
 
         public void ReportInvalidReturnWithValueInGlobalStatements(TextLocation location)
         {
-            var message = "The 'return' keyword cannot be followed by an expression in global statements.";
+            const string? message = "The 'return' keyword cannot be followed by an expression in global statements.";
             ReportError(location, message);
         }
 
@@ -186,31 +209,31 @@ namespace EV2.CodeAnalysis
 
         public void ReportInvalidExpressionStatement(TextLocation location)
         {
-            var message = $"Only assignment and call expressions can be used as a statement.";
+            const string? message = "Only assignment and call expressions can be used as a statement.";
             ReportError(location, message);
         }
 
         public void ReportInvalidAssignmentExpressionStatement(TextLocation location)
         {
-            var message = $"Only field declarations and assignment expressions are allowed in structs.";
+            const string? message = "Only field declarations and assignment expressions are allowed in structs.";
             ReportError(location, message);
         }
 
         public void ReportOnlyOneFileCanHaveGlobalStatements(TextLocation location)
         {
-            var message = $"At most one file can have global statements.";
+            const string? message = "At most one file can have global statements.";
             ReportError(location, message);
         }
 
         public void ReportMainMustHaveCorrectSignature(TextLocation location)
         {
-            var message = $"main must not take arguments and not return anything.";
+            const string? message = "main must not take arguments and not return anything.";
             ReportError(location, message);
         }
 
         public void ReportCannotMixMainAndGlobalStatements(TextLocation location)
         {
-            var message = $"Cannot declare main function when global statements are used.";
+            const string? message = "Cannot declare main function when global statements are used.";
             ReportError(location, message);
         }
 
@@ -253,7 +276,7 @@ namespace EV2.CodeAnalysis
 
         public void ReportUnreachableCode(TextLocation location)
         {
-            var message = $"Unreachable code detected.";
+            const string? message = "Unreachable code detected.";
             ReportWarning(location, message);
         }
 

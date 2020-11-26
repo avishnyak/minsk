@@ -19,7 +19,7 @@ namespace EV2.CodeAnalysis.Emit
     {
         private const TypeAttributes _classAttributes = TypeAttributes.Class | TypeAttributes.NotPublic | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit;
 
-        private DiagnosticBag _diagnostics = new DiagnosticBag();
+        private readonly DiagnosticBag _diagnostics = new DiagnosticBag();
 
         private readonly Dictionary<TypeSymbol, TypeReference> _knownTypes;
         private readonly MethodReference _objectCtor;
@@ -44,9 +44,9 @@ namespace EV2.CodeAnalysis.Emit
         private readonly Dictionary<BoundLabel, int> _labels = new Dictionary<BoundLabel, int>();
         private readonly List<(int InstructionIndex, BoundLabel Target)> _fixups = new List<(int InstructionIndex, BoundLabel Target)>();
 
-        private TypeDefinition _typeDefinition;
+        private readonly TypeDefinition _typeDefinition;
         private FieldDefinition? _randomFieldDefinition;
-        private Dictionary<SourceText, Document> _documents = new Dictionary<SourceText, Document>();
+        private readonly Dictionary<SourceText, Document> _documents = new Dictionary<SourceText, Document>();
 
         // TOOD: This constructor does too much. Resolution should be factored out.
         private Emitter(string moduleName, string[] references)
@@ -227,10 +227,12 @@ namespace EV2.CodeAnalysis.Emit
             using (var outputStream = File.Create(outputPath))
             using (var symbolsStream = File.Create(symbolsPath))
             {
-                var writerParameters = new WriterParameters();
-                writerParameters.WriteSymbols = true;
-                writerParameters.SymbolStream = symbolsStream;
-                writerParameters.SymbolWriterProvider = new PortablePdbWriterProvider();
+                var writerParameters = new WriterParameters
+                {
+                    WriteSymbols = true,
+                    SymbolStream = symbolsStream,
+                    SymbolWriterProvider = new PortablePdbWriterProvider()
+                };
                 _assemblyDefinition.Write(outputStream, writerParameters);
             }
 
@@ -396,12 +398,12 @@ namespace EV2.CodeAnalysis.Emit
             foreach (var statement in body.Statements)
                 EmitStatement(ilProcessor, statement);
 
-            foreach (var fixup in _fixups)
+            foreach (var (InstructionIndex, Target) in _fixups)
             {
-                var targetLabel = fixup.Target;
+                var targetLabel = Target;
                 var targetInstructionIndex = _labels[targetLabel];
                 var targetInstruction = ilProcessor.Body.Instructions[targetInstructionIndex];
-                var instructionToFixup = ilProcessor.Body.Instructions[fixup.InstructionIndex];
+                var instructionToFixup = ilProcessor.Body.Instructions[InstructionIndex];
                 instructionToFixup.Operand = targetInstruction;
             }
 
@@ -409,7 +411,7 @@ namespace EV2.CodeAnalysis.Emit
 
             // TODO: Only emit this when emitting symbols
 
-            method.DebugInformation.Scope = new ScopeDebugInformation(method.Body.Instructions.First(), method.Body.Instructions.Last());
+            method.DebugInformation.Scope = new ScopeDebugInformation(method.Body.Instructions[0], method.Body.Instructions.Last());
 
             foreach (var local in _locals)
             {
@@ -454,12 +456,12 @@ namespace EV2.CodeAnalysis.Emit
             }
         }
 
-        private void EmitNopStatement(ILProcessor ilProcessor, BoundNopStatement node)
+        private static void EmitNopStatement(ILProcessor ilProcessor, BoundNopStatement node)
         {
             ilProcessor.Emit(OpCodes.Nop);
         }
 
-        private void EmitFieldAssignment(ILProcessor ilProcessor, BoundVariableDeclaration node, FieldDefinition field)
+        private static void EmitFieldAssignment(ILProcessor ilProcessor, BoundVariableDeclaration node, FieldDefinition field)
         {
             ilProcessor.Emit(OpCodes.Ldarg_0);
 
@@ -552,14 +554,8 @@ namespace EV2.CodeAnalysis.Emit
 
             switch (node.Kind)
             {
-                case BoundNodeKind.VariableExpression:
-                    EmitVariableExpression(ilProcessor, (BoundVariableExpression)node);
-                    break;
                 case BoundNodeKind.AssignmentExpression:
                     EmitAssignmentExpression(ilProcessor, (BoundAssignmentExpression)node);
-                    break;
-                case BoundNodeKind.UnaryExpression:
-                    EmitUnaryExpression(ilProcessor, (BoundUnaryExpression)node);
                     break;
                 case BoundNodeKind.BinaryExpression:
                     EmitBinaryExpression(ilProcessor, (BoundBinaryExpression)node);
@@ -576,9 +572,23 @@ namespace EV2.CodeAnalysis.Emit
                 case BoundNodeKind.FieldAssignmentExpression:
                     EmitFieldAssignmentExpression(ilProcessor, (BoundFieldAssignmentExpression)node);
                     break;
+                case BoundNodeKind.ThisExpression:
+                    EmitThisExpression(ilProcessor, (BoundThisExpression)node);
+                    break;
+                case BoundNodeKind.UnaryExpression:
+                    EmitUnaryExpression(ilProcessor, (BoundUnaryExpression)node);
+                    break;
+                case BoundNodeKind.VariableExpression:
+                    EmitVariableExpression(ilProcessor, (BoundVariableExpression)node);
+                    break;
                 default:
                     throw new Exception($"Unexpected node kind {node.Kind}");
             }
+        }
+
+        private void EmitThisExpression(ILProcessor ilProcessor, BoundThisExpression node)
+        {
+            ilProcessor.Emit(OpCodes.Ldarg_0);
         }
 
         private void EmitFieldAssignmentExpression(ILProcessor ilProcessor, BoundFieldAssignmentExpression node)
@@ -589,18 +599,6 @@ namespace EV2.CodeAnalysis.Emit
 
             EmitExpression(ilProcessor, node.StructInstance);
             EmitExpression(ilProcessor, node.Expression);
-
-            // We have to assign a the value to a local variable in case someone does
-            // something like:
-            // x = obj.field = 10
-            //
-            // The stack needs to keep a copy of the "Expression" value after the field assignment
-            ilProcessor.Emit(OpCodes.Dup);
-
-            var typeReference = _knownTypes[node.Expression.Type];
-            var variableDefinition = new VariableDefinition(typeReference);
-            ilProcessor.Body.Variables.Add(variableDefinition);
-            ilProcessor.Emit(OpCodes.Stloc, variableDefinition);
 
             var @struct = _structs[structSymbol];
 
@@ -613,7 +611,8 @@ namespace EV2.CodeAnalysis.Emit
                 }
             }
 
-            ilProcessor.Emit(OpCodes.Ldloc, variableDefinition);
+            // Tmp variable that will get popped
+            ilProcessor.Emit(OpCodes.Ldc_I4_0);
         }
 
         private void EmitFieldAccessExpression(ILProcessor ilProcessor, BoundFieldAccessExpression node)
@@ -636,7 +635,7 @@ namespace EV2.CodeAnalysis.Emit
             }
         }
 
-        private void EmitConstantExpression(ILProcessor ilProcessor, BoundExpression node)
+        private static void EmitConstantExpression(ILProcessor ilProcessor, BoundExpression node)
         {
             Debug.Assert(node.ConstantValue != null);
 
@@ -666,7 +665,7 @@ namespace EV2.CodeAnalysis.Emit
         {
             if (node.Variable is ParameterSymbol parameter)
             {
-                ilProcessor.Emit(OpCodes.Ldarg, parameter.Ordinal);
+                ilProcessor.Emit(OpCodes.Ldarg, ilProcessor.Body.Method.HasThis ? parameter.Ordinal + 1 : parameter.Ordinal);
             }
             else
             {
@@ -731,8 +730,8 @@ namespace EV2.CodeAnalysis.Emit
 
             if (node.Op.Kind == BoundBinaryOperatorKind.Equals)
             {
-                if (node.Left.Type == TypeSymbol.Any && node.Right.Type == TypeSymbol.Any ||
-                    node.Left.Type == TypeSymbol.String && node.Right.Type == TypeSymbol.String)
+                if ((node.Left.Type == TypeSymbol.Any && node.Right.Type == TypeSymbol.Any) ||
+                    (node.Left.Type == TypeSymbol.String && node.Right.Type == TypeSymbol.String))
                 {
                     ilProcessor.Emit(OpCodes.Call, _objectEqualsReference);
                     return;
@@ -744,8 +743,8 @@ namespace EV2.CodeAnalysis.Emit
 
             if (node.Op.Kind == BoundBinaryOperatorKind.NotEquals)
             {
-                if (node.Left.Type == TypeSymbol.Any && node.Right.Type == TypeSymbol.Any ||
-                    node.Left.Type == TypeSymbol.String && node.Right.Type == TypeSymbol.String)
+                if ((node.Left.Type == TypeSymbol.Any && node.Right.Type == TypeSymbol.Any) ||
+                    (node.Left.Type == TypeSymbol.String && node.Right.Type == TypeSymbol.String))
                 {
                     ilProcessor.Emit(OpCodes.Call, _objectEqualsReference);
                     ilProcessor.Emit(OpCodes.Ldc_I4_0);
@@ -949,6 +948,10 @@ namespace EV2.CodeAnalysis.Emit
                 else if (node.Instance is BoundFieldAccessExpression field)
                 {
                     EmitFieldAccessExpression(ilProcessor, field);
+                }
+                else if (node.Instance is BoundThisExpression instance)
+                {
+                    EmitThisExpression(ilProcessor, instance);
                 }
                 else
                 {

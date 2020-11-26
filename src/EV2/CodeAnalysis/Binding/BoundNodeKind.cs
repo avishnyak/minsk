@@ -23,13 +23,14 @@ namespace EV2.CodeAnalysis.Binding
         BinaryExpression,
         CallExpression,
         CompoundAssignmentExpression,
+        CompoundFieldAssignmentExpression,
         ConversionExpression,
         ErrorExpression,
         FieldAccessExpression,
         FieldAssignmentExpression,
         LiteralExpression,
+        ThisExpression,
         UnaryExpression,
         VariableExpression,
-        CompoundFieldAssignmentExpression,
     }
 }
