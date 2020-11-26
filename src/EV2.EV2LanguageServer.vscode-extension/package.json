@@ -60,6 +60,6 @@
     },
     "dependencies": {
         "vscode-languageclient": "^7.0.0-next.9",
-        "vscode-languageserver-protocol": "^3.16.0-next.7"
+        "vscode-languageserver-protocol": "^3.16.0-next.11"
     }
 }
