@@ -18,7 +18,7 @@ jobs:
       with:
         dotnet-version: 5.0.100
     - name: Install dependencies
-      run: dotnet restore
+      run: dotnet restore ./src/EV2lang.sln
     - name: Build
       run: dotnet build ./src/EV2lang.sln --configuration Release --no-restore
     - name: Test
