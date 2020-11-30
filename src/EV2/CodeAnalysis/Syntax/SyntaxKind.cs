@@ -17,6 +17,7 @@ namespace EV2.CodeAnalysis.Syntax
         AmpersandToken,
         BangEqualsToken,
         BangToken,
+        CharToken,
         CloseBraceToken,
         CloseParenthesisToken,
         ColonToken,

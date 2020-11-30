@@ -461,6 +461,7 @@ namespace EV2.CodeAnalysis.Syntax
         {
             return Current.Kind switch
             {
+                SyntaxKind.CharToken => ParseCharLiteral(),
                 SyntaxKind.DefaultKeyword => ParseDefaultLiteral(),
                 SyntaxKind.FalseKeyword or SyntaxKind.TrueKeyword => ParseBooleanLiteral(),
                 SyntaxKind.NumberToken => ParseNumberLiteral(),
@@ -500,6 +501,12 @@ namespace EV2.CodeAnalysis.Syntax
         private ExpressionSyntax ParseStringLiteral()
         {
             var stringToken = MatchToken(SyntaxKind.StringToken);
+            return new LiteralExpressionSyntax(_syntaxTree, stringToken);
+        }
+
+        private ExpressionSyntax ParseCharLiteral()
+        {
+            var stringToken = MatchToken(SyntaxKind.CharToken);
             return new LiteralExpressionSyntax(_syntaxTree, stringToken);
         }
 

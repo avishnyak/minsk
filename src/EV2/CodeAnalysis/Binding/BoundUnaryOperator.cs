@@ -1,4 +1,4 @@
-using System;
+using System.Collections.Generic;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 
@@ -6,6 +6,28 @@ namespace EV2.CodeAnalysis.Binding
 {
     internal sealed class BoundUnaryOperator
     {
+        private static List<BoundUnaryOperator> _operators = new List<BoundUnaryOperator>()
+        {
+            new BoundUnaryOperator(SyntaxKind.BangToken, BoundUnaryOperatorKind.LogicalNegation, TypeSymbol.Bool),
+        };
+
+        static BoundUnaryOperator()
+        {
+            TypeSymbol[] numericTypes = {
+                TypeSymbol.Char,
+                TypeSymbol.Int8, TypeSymbol.Int16, TypeSymbol.Int32, TypeSymbol.Int64,
+                TypeSymbol.UInt8, TypeSymbol.UInt16, TypeSymbol.UInt32, TypeSymbol.UInt64,
+                TypeSymbol.Float32, TypeSymbol.Float64, TypeSymbol.Decimal
+            };
+
+            foreach (var type in numericTypes)
+            {
+                _operators.Add(new BoundUnaryOperator(SyntaxKind.PlusToken, BoundUnaryOperatorKind.Identity, type));
+                _operators.Add(new BoundUnaryOperator(SyntaxKind.MinusToken, BoundUnaryOperatorKind.Negation, type));
+                _operators.Add(new BoundUnaryOperator(SyntaxKind.TildeToken, BoundUnaryOperatorKind.OnesComplement, type));
+            }
+        }
+
         private BoundUnaryOperator(SyntaxKind syntaxKind, BoundUnaryOperatorKind kind, TypeSymbol operandType)
             : this(syntaxKind, kind, operandType, operandType)
         {
@@ -23,15 +45,6 @@ namespace EV2.CodeAnalysis.Binding
         public BoundUnaryOperatorKind Kind { get; }
         public TypeSymbol OperandType { get; }
         public TypeSymbol Type { get; }
-
-        private static BoundUnaryOperator[] _operators =
-        {
-            new BoundUnaryOperator(SyntaxKind.BangToken, BoundUnaryOperatorKind.LogicalNegation, TypeSymbol.Bool),
-
-            new BoundUnaryOperator(SyntaxKind.PlusToken, BoundUnaryOperatorKind.Identity, TypeSymbol.Int),
-            new BoundUnaryOperator(SyntaxKind.MinusToken, BoundUnaryOperatorKind.Negation, TypeSymbol.Int),
-            new BoundUnaryOperator(SyntaxKind.TildeToken, BoundUnaryOperatorKind.OnesComplement, TypeSymbol.Int),
-        };
 
         public static BoundUnaryOperator? Bind(SyntaxKind syntaxKind, TypeSymbol operandType)
         {

@@ -1,8 +1,18 @@
 Hello world!
 Variable types
 Hello
+A
+8
+16
 123
-False
+-64000000
+8
+16
+123
+64000000
+8
+-16.31999969482422
+True
 Variables with implied types
 Hello
 123
