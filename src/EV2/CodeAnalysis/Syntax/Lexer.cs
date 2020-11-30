@@ -402,6 +402,7 @@ namespace EV2.CodeAnalysis.Syntax
                     }
                     break;
                 case '"':
+                case '\'':
                     ReadString();
                     break;
                 case '0': case '1': case '2': case '3': case '4':
@@ -430,6 +431,7 @@ namespace EV2.CodeAnalysis.Syntax
         private void ReadString()
         {
             // Skip the current quote
+            var quoteChar = Current;
             _position++;
 
             var sb = new StringBuilder();
@@ -447,8 +449,9 @@ namespace EV2.CodeAnalysis.Syntax
                         Diagnostics.ReportUnterminatedString(location);
                         done = true;
                         break;
+                    case '\'':
                     case '"':
-                        if (Lookahead == '"')
+                        if (Lookahead == quoteChar)
                         {
                             sb.Append(Current);
                             _position += 2;
@@ -466,25 +469,103 @@ namespace EV2.CodeAnalysis.Syntax
                 }
             }
 
-            _kind = SyntaxKind.StringToken;
-            _value = sb.ToString();
+            _kind = quoteChar == '"' ? SyntaxKind.StringToken : SyntaxKind.CharToken;
+
+            if (quoteChar == '"')
+            {
+                _value = sb.ToString();
+            }
+            else
+            {
+                if (sb.Length > 1)
+                {
+                    var span = new TextSpan(_start, 1);
+                    var location = new TextLocation(_text, span);
+
+                    if (sb.Length == 0)
+                    {
+                        Diagnostics.ReportEmptyCharConst(location);
+                    }
+                    else
+                    {
+                        Diagnostics.ReportInvalidCharConst(location);
+                    }
+                }
+
+                _value = sb[0];
+            }
         }
 
         private void ReadNumber()
         {
-            while (char.IsDigit(Current))
-                _position++;
+            bool hasSeparator = false;
+            bool hasDecimal = false;
+            bool hasMultipleDecimals = false;
 
-            var length = _position - _start;
-            var text = _text.ToString(_start, length);
-            if (!int.TryParse(text, out var value))
+            // Allow numbers and underscores as long as there are more digits following them.
+            // This allows _ to act as separators for numeric literals (e.g. 1_000_000)
+            while (char.IsDigit(Current) || (Current == '_' && char.IsDigit(Peek(1))) || (Current == '.' && char.IsDigit(Peek(1))))
             {
-                var span = new TextSpan(_start, length);
-                var location = new TextLocation(_text, span);
-                Diagnostics.ReportInvalidNumber(location, text, TypeSymbol.Int);
+                if (!hasSeparator && Current == '_')
+                    hasSeparator = true;
+
+                if (Current == '.')
+                {
+                    if (hasDecimal)
+                        hasMultipleDecimals = true;
+
+                    hasDecimal = true;
+                }
+
+                _position++;
             }
 
-            _value = value;
+            var length = _position - _start;
+            var text = _text.ToString(_start, length).Replace("_", string.Empty);
+
+            var span = new TextSpan(_start, length);
+            var location = new TextLocation(_text, span);
+
+            // Underscores followed by a number are valid identifiers
+            if (text.StartsWith('_'))
+                Diagnostics.ReportInvalidNumber(location, text, TypeSymbol.Decimal);
+
+            if (hasMultipleDecimals)
+                Diagnostics.ReportInvalidNumber(location, text, TypeSymbol.Decimal);
+
+            if (hasDecimal)
+            {
+                if (!double.TryParse(text, out double fvalue))
+                {
+                    Diagnostics.ReportInvalidNumber(location, text, TypeSymbol.Decimal);
+                }
+                else
+                {
+                    if (fvalue >= float.MinValue && fvalue <= float.MaxValue)
+                        _value = (float)fvalue;
+                    else if (fvalue >= double.MinValue && fvalue <= double.MaxValue)
+                        _value = fvalue;
+                }
+            }
+            else
+            {
+                if (!ulong.TryParse(text, out ulong ivalue))
+                {
+                    Diagnostics.ReportInvalidNumber(location, text, TypeSymbol.Int32);
+                }
+                else
+                {
+                    if (ivalue <= int.MaxValue)
+                        _value = (int)ivalue;
+                    else if (ivalue <= uint.MaxValue)
+                        _value = (uint)ivalue;
+                    else if (ivalue <= long.MaxValue)
+                        _value = ivalue;
+                    else if (ivalue <= ulong.MaxValue)
+                        _value = ivalue;
+                }
+            }
+
             _kind = SyntaxKind.NumberToken;
         }
 

@@ -2,12 +2,11 @@
 struct Point
 {
     var x = 0
-    var y: int
+    var y: int32
 }
 
-// Structs can have functions "attached" to them. With this notation, it is
-// straight forward to be able to "augment" a struct with functions in multiple
-// files.
+// Structs can be "receivers" of a function.  This approach makes it easier to
+// compose functionality from multiple files.
 function Point.double()
 {
     // Call other functions with this struct instance as the receiver

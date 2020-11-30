@@ -457,6 +457,38 @@ namespace EV2.CodeAnalysis.Binding
             {
                 var initializer = BindExpression(syntax.Initializer);
                 var variableType = type ?? initializer.Type;
+
+                if (initializer is BoundLiteralExpression ble && variableType.IsNumeric && ble.Type != variableType)
+                {
+                    // Check for over/underflows and adjust type
+                    object? newValue = null;
+
+                    if (variableType == TypeSymbol.Int8)
+                        newValue = Convert.ToSByte(ble.Value);
+                    else if (variableType == TypeSymbol.Int16)
+                        newValue = Convert.ToInt16(ble.Value);
+                    else if (variableType == TypeSymbol.Int32)
+                        newValue = Convert.ToInt32(ble.Value);
+                    else if (variableType == TypeSymbol.Int64)
+                        newValue = Convert.ToInt64(ble.Value);
+                    else if (variableType == TypeSymbol.UInt8)
+                        newValue = Convert.ToByte(ble.Value);
+                    else if (variableType == TypeSymbol.UInt16)
+                        newValue = Convert.ToUInt16(ble.Value);
+                    else if (variableType == TypeSymbol.UInt32)
+                        newValue = Convert.ToUInt32(ble.Value);
+                    else if (variableType == TypeSymbol.UInt64)
+                        newValue = Convert.ToUInt64(ble.Value);
+                    else if (variableType == TypeSymbol.Float32)
+                        newValue = Convert.ToSingle(ble.Value);
+                    else if (variableType == TypeSymbol.Float64)
+                        newValue = Convert.ToDouble(ble.Value);
+                    else if (variableType == TypeSymbol.Decimal)
+                        newValue = Convert.ToDecimal(ble.Value);
+
+                    initializer = new BoundLiteralExpression(syntax.Initializer, newValue);
+                }
+
                 var variable = BindVariableDeclaration(syntax.Identifier, isReadOnly, variableType, initializer.ConstantValue);
                 var convertedInitializer = BindConversion(syntax.Initializer.Location, initializer, variableType);
 
@@ -597,12 +629,12 @@ namespace EV2.CodeAnalysis.Binding
 
         private BoundStatement BindForStatement(ForStatementSyntax syntax)
         {
-            var lowerBound = BindExpression(syntax.LowerBound, TypeSymbol.Int);
-            var upperBound = BindExpression(syntax.UpperBound, TypeSymbol.Int);
+            var lowerBound = BindExpression(syntax.LowerBound, TypeSymbol.Int32);
+            var upperBound = BindExpression(syntax.UpperBound, TypeSymbol.Int32);
 
             _scope = new BoundScope(_scope);
 
-            var variable = BindVariableDeclaration(syntax.Identifier, isReadOnly: true, TypeSymbol.Int);
+            var variable = BindVariableDeclaration(syntax.Identifier, isReadOnly: true, TypeSymbol.Int32);
             var body = BindLoopBody(syntax.Body, out var breakLabel, out var continueLabel);
 
             _scope = _scope.Parent!;
@@ -882,11 +914,35 @@ namespace EV2.CodeAnalysis.Binding
                 return new BoundErrorExpression(syntax);
             }
 
+            // Set up an implicit conversion if necessary
+            if (boundLeft.Type != boundRight.Type)
+            {
+                var conversion = Conversion.Classify(boundRight.Type, boundLeft.Type);
+
+                if (conversion.Exists && conversion.IsImplicit)
+                {
+                    boundRight = BindConversion(syntax.Right, boundLeft.Type, false);
+                }
+                else
+                {
+                    conversion = Conversion.Classify(boundLeft.Type, boundRight.Type);
+                    if (conversion.Exists && conversion.IsImplicit)
+                    {
+                        boundLeft = BindConversion(syntax.Left, boundRight.Type, false);
+                    }
+                }
+            }
+
             var boundOperator = BoundBinaryOperator.Bind(syntax.OperatorToken.Kind, boundLeft.Type, boundRight.Type);
 
             if (boundOperator == null)
             {
                 Diagnostics.ReportUndefinedBinaryOperator(syntax.OperatorToken.Location, syntax.OperatorToken.Text, boundLeft.Type, boundRight.Type);
+                return new BoundErrorExpression(syntax);
+            }
+            else if (boundOperator.Kind == BoundBinaryOperatorKind.Division && boundRight.ConstantValue != null && boundRight.ConstantValue.IsZero)
+            {
+                Diagnostics.ReportDivideByZero(syntax.Location);
                 return new BoundErrorExpression(syntax);
             }
 
@@ -908,7 +964,7 @@ namespace EV2.CodeAnalysis.Binding
 
             foreach (var argument in syntax.Arguments)
             {
-                var boundArgument = BindExpression(argument);
+                var boundArgument = BindExpression(argument, false);
                 boundArguments.Add(boundArgument);
             }
 
@@ -1246,11 +1302,48 @@ namespace EV2.CodeAnalysis.Binding
                 case "any":
                     return TypeSymbol.Any;
 
+                // Boolean types
                 case "bool":
                     return TypeSymbol.Bool;
 
-                case "int":
-                    return TypeSymbol.Int;
+                // Integer types
+                case "int8":
+                    return TypeSymbol.Int8;
+
+                case "int16":
+                    return TypeSymbol.Int16;
+
+                case "int32":
+                    return TypeSymbol.Int32;
+
+                case "int64":
+                    return TypeSymbol.Int64;
+
+                case "uint8":
+                    return TypeSymbol.UInt8;
+
+                case "uint16":
+                    return TypeSymbol.UInt16;
+
+                case "uint32":
+                    return TypeSymbol.UInt32;
+
+                case "uint64":
+                    return TypeSymbol.UInt64;
+
+                // Float types
+                case "float32":
+                    return TypeSymbol.Float32;
+
+                case "float64":
+                    return TypeSymbol.Float64;
+
+                case "float128":
+                    return TypeSymbol.Decimal;
+
+                // String types
+                case "char":
+                    return TypeSymbol.Char;
 
                 case "string":
                     return TypeSymbol.String;

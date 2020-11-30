@@ -29,6 +29,19 @@ namespace EV2.Tests.CodeAnalysis
         }
 
         [Fact]
+        public void Evaluator_BinaryExpression_DivisionByZero()
+        {
+            const string? text = @"
+                var x: int32 = [1 / 0]
+            ";
+
+            const string? diagnostics = @"
+                Division by zero.
+            ";
+
+            AssertDiagnostics(text, diagnostics);
+        }
+        [Fact]
         public void Evaluator_BlockStatement_NoInfiniteLoop()
         {
             const string? text = @"
@@ -112,7 +125,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_FunctionReturn_Missing()
         {
             const string? text = @"
-                function [add](a: int, b: int): int
+                function [add](a: int32, b: int32): int32
                 {
                 }
             ";
@@ -136,7 +149,7 @@ namespace EV2.Tests.CodeAnalysis
             ";
 
             const string? diagnostics = @"
-                Cannot convert type 'int' to 'bool'.
+                Cannot convert type 'int32' to 'bool'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -154,7 +167,7 @@ namespace EV2.Tests.CodeAnalysis
             ";
 
             const string? diagnostics = @"
-                Cannot convert type 'int' to 'bool'.
+                Cannot convert type 'int32' to 'bool'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -173,7 +186,7 @@ namespace EV2.Tests.CodeAnalysis
             ";
 
             const string? diagnostics = @"
-                Cannot convert type 'int' to 'bool'.
+                Cannot convert type 'int32' to 'bool'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -191,7 +204,7 @@ namespace EV2.Tests.CodeAnalysis
             ";
 
             const string? diagnostics = @"
-                Cannot convert type 'bool' to 'int'.
+                Cannot convert type 'bool' to 'int32'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -209,7 +222,7 @@ namespace EV2.Tests.CodeAnalysis
             ";
 
             const string? diagnostics = @"
-                Cannot convert type 'bool' to 'int'.
+                Cannot convert type 'bool' to 'int32'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -257,7 +270,7 @@ namespace EV2.Tests.CodeAnalysis
             const string? text = @"10 [*] false";
 
             const string? diagnostics = @"
-                Binary operator '*' is not defined for types 'int' and 'bool'.
+                Binary operator '*' is not defined for types 'int32' and 'bool'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -270,7 +283,7 @@ namespace EV2.Tests.CodeAnalysis
                          x [+=] false";
 
             const string? diagnostics = @"
-                Binary operator '+=' is not defined for types 'int' and 'bool'.
+                Binary operator '+=' is not defined for types 'int32' and 'bool'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -357,7 +370,7 @@ namespace EV2.Tests.CodeAnalysis
             ";
 
             const string? diagnostics = @"
-                Cannot convert type 'bool' to 'int'.
+                Cannot convert type 'bool' to 'int32'.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -430,14 +443,14 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_Function_With_ReturnValue_Should_Not_Return_Void()
         {
             const string? text = @"
-                function test(): int
+                function test(): int32
                 {
                     [return]
                 }
             ";
 
             const string? diagnostics = @"
-                An expression of type 'int' is expected.
+                An expression of type 'int32' is expected.
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -447,7 +460,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_Not_All_Code_Paths_Return_Value()
         {
             const string? text = @"
-                function [test](n: int): bool
+                function [test](n: int32): bool
                 {
                     if (n > 10)
                        return true
@@ -465,7 +478,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_Expression_Must_Have_Value()
         {
             const string? text = @"
-                function test(n: int)
+                function test(n: int32)
                 {
                     return
                 }
@@ -508,7 +521,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_ElseStatement_Reports_NotReachableCode_Warning()
         {
             const string? text = @"
-                function test(): int
+                function test(): int32
                 {
                     if true
                     {
@@ -564,7 +577,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_Parameter_Already_Declared()
         {
             const string? text = @"
-                function sum(a: int, b: int, [a: int]): int
+                function sum(a: int32, b: int32, [a: int32]): int32
                 {
                     return a + b + c
                 }
@@ -581,7 +594,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_Function_Must_Have_Name()
         {
             const string? text = @"
-                function [(]a: int, b: int): int
+                function [(]a: int32, b: int32): int32
                 {
                     return a + b
                 }
@@ -598,7 +611,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_Wrong_Argument_Type()
         {
             const string? text = @"
-                function test(n: int): bool
+                function test(n: int32): bool
                 {
                     return n > 10
                 }
@@ -607,7 +620,7 @@ namespace EV2.Tests.CodeAnalysis
             ";
 
             const string? diagnostics = @"
-                Cannot convert type 'string' to 'int'. An explicit conversion exists (are you missing a cast?)
+                Cannot convert type 'string' to 'int32'. An explicit conversion exists (are you missing a cast?)
             ";
 
             AssertDiagnostics(text, diagnostics);
@@ -633,7 +646,7 @@ namespace EV2.Tests.CodeAnalysis
         public void Evaluator_Cannot_Access_Member()
         {
             const string? text = @"
-                var p: int = 0
+                var p: int32 = 0
 
                 print([p].[[length]])
             ";

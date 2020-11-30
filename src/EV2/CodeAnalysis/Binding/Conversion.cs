@@ -23,32 +23,55 @@ namespace EV2.CodeAnalysis.Binding
 
         public static Conversion Classify(TypeSymbol from, TypeSymbol to)
         {
+            // No cast necessary if both types are the same
             if (from == to)
-                return Conversion.Identity;
+                return Identity;
 
             if (from != TypeSymbol.Void && to == TypeSymbol.Any)
-            {
-                return Conversion.Implicit;
-            }
+                return Implicit;
 
+            // Casting to the same type but with more bits can be implicit
+            if (from == TypeSymbol.Int8 && (to == TypeSymbol.Int16 || to == TypeSymbol.Int32 || to == TypeSymbol.Int64))
+                return Implicit;
+
+            if (from == TypeSymbol.Int16 && (to == TypeSymbol.Int32 || to == TypeSymbol.Int64))
+                return Implicit;
+
+            if (from == TypeSymbol.Int32 && to == TypeSymbol.Int64)
+                return Implicit;
+
+            if (from == TypeSymbol.UInt8 && (to == TypeSymbol.UInt16 || to == TypeSymbol.UInt32 || to == TypeSymbol.UInt64))
+                return Implicit;
+
+            if (from == TypeSymbol.UInt16 && (to == TypeSymbol.UInt32 || to == TypeSymbol.UInt64))
+                return Implicit;
+
+            if (from == TypeSymbol.UInt32 && to == TypeSymbol.UInt64)
+                return Implicit;
+
+            if ((from == TypeSymbol.Int8 || from == TypeSymbol.Int16 || from == TypeSymbol.Int32 || from == TypeSymbol.Int64 || from == TypeSymbol.UInt8 || from == TypeSymbol.UInt16 || from == TypeSymbol.UInt32 || from == TypeSymbol.UInt64)
+                && (to == TypeSymbol.Float32 || to == TypeSymbol.Float64 || to == TypeSymbol.Decimal))
+                return Implicit;
+
+            if (from == TypeSymbol.Float32 && to == TypeSymbol.Float64)
+                return Implicit;
+
+            // Explicit casts
             if (from == TypeSymbol.Any && to != TypeSymbol.Void)
-            {
-                return Conversion.Explicit;
-            }
+                return Explicit;
 
-            if (from == TypeSymbol.Bool || from == TypeSymbol.Int)
-            {
+            if (from.IsNumeric && to.IsNumeric)
+                return Explicit;
+
+            if (from == TypeSymbol.Bool || from.IsNumeric)
                 if (to == TypeSymbol.String)
-                    return Conversion.Explicit;
-            }
+                    return Explicit;
 
             if (from == TypeSymbol.String)
-            {
-                if (to == TypeSymbol.Bool || to == TypeSymbol.Int)
-                    return Conversion.Explicit;
-            }
+                if (to == TypeSymbol.Bool || to.IsNumeric)
+                    return Explicit;
 
-            return Conversion.None;
+            return None;
         }
     }
 }

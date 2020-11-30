@@ -11,8 +11,30 @@ namespace EV2.CodeAnalysis.Binding
         {
             if (value is bool)
                 Type = TypeSymbol.Bool;
+            else if (value is sbyte)
+                Type = TypeSymbol.Int8;
+            else if (value is short)
+                Type = TypeSymbol.Int16;
             else if (value is int)
-                Type = TypeSymbol.Int;
+                Type = TypeSymbol.Int32;
+            else if (value is long)
+                Type = TypeSymbol.Int64;
+            else if (value is byte)
+                Type = TypeSymbol.Int8;
+            else if (value is ushort)
+                Type = TypeSymbol.UInt16;
+            else if (value is uint)
+                Type = TypeSymbol.UInt32;
+            else if (value is ulong)
+                Type = TypeSymbol.UInt64;
+            else if (value is float)
+                Type = TypeSymbol.Float32;
+            else if (value is double)
+                Type = TypeSymbol.Float64;
+            else if (value is decimal)
+                Type = TypeSymbol.Decimal;
+            else if (value is char)
+                Type = TypeSymbol.Char;
             else if (value is string)
                 Type = TypeSymbol.String;
             else if (value is null)
