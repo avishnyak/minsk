@@ -295,19 +295,19 @@ namespace EV2.CodeAnalysis.Binding
 
         private static void WriteLiteralExpression(BoundLiteralExpression node, IndentedTextWriter writer)
         {
-            var value = node.Value.ToString()!;
+            var value = node.Value!.ToString();
 
             if (node.Type == TypeSymbol.Bool)
             {
                 writer.WriteKeyword((bool)node.Value ? SyntaxKind.TrueKeyword : SyntaxKind.FalseKeyword);
             }
-            else if (node.Type == TypeSymbol.Int)
+            else if (node.Type.IsNumeric)
             {
-                writer.WriteNumber(value);
+                writer.WriteNumber(value ?? "");
             }
             else if (node.Type == TypeSymbol.String)
             {
-                value = "\"" + value.Replace("\"", "\"\"") + "\"";
+                value = "\"" + (value ?? "").Replace("\"", "\"\"") + "\"";
                 writer.WriteString(value);
             }
             else

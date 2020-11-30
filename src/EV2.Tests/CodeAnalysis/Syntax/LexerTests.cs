@@ -12,7 +12,7 @@ namespace EV2.Tests.CodeAnalysis.Syntax
         [Fact]
         public void Lexer_Lexes_UnterminatedString()
         {
-            var text = "\"text";
+            const string? text = "\"text";
             var tokens = SyntaxTree.ParseTokens(text, out var diagnostics);
 
             var token = Assert.Single(tokens);
@@ -116,28 +116,45 @@ namespace EV2.Tests.CodeAnalysis.Syntax
             Assert.Equal(name, token.Text);
         }
 
+        [Theory]
+        [InlineData("42", 42)]
+        [InlineData("42.01", 42.01)]
+        [InlineData("1_000_000", 1_000_000)]
+        [InlineData("1_000_000.001", 1_000_000)]
+        public void Lexer_Lexes_NumberLiterals(string text, float value)
+        {
+            var tokens = SyntaxTree.ParseTokens(text).ToArray();
+
+            Assert.Single(tokens);
+
+            var token = tokens[0];
+            Assert.Equal(SyntaxKind.NumberToken, token.Kind);
+            Assert.Equal(text, token.Text);
+            Assert.Equal(float.Parse(text.Replace("_", "")), value);
+        }
+
         public static IEnumerable<object[]> GetTokensData()
         {
-            foreach (var t in GetTokens())
-                yield return new object[] { t.kind, t.text };
+            foreach (var (kind, text) in GetTokens())
+                yield return new object[] { kind, text };
         }
 
         public static IEnumerable<object[]> GetSeparatorsData()
         {
-            foreach (var t in GetSeparators())
-                yield return new object[] { t.kind, t.text };
+            foreach (var (kind, text) in GetSeparators())
+                yield return new object[] { kind, text };
         }
 
         public static IEnumerable<object[]> GetTokenPairsData()
         {
-            foreach (var t in GetTokenPairs())
-                yield return new object[] { t.t1Kind, t.t1Text, t.t2Kind, t.t2Text };
+            foreach (var (t1Kind, t1Text, t2Kind, t2Text) in GetTokenPairs())
+                yield return new object[] { t1Kind, t1Text, t2Kind, t2Text };
         }
 
         public static IEnumerable<object[]> GetTokenPairsWithSeparatorData()
         {
-            foreach (var t in GetTokenPairsWithSeparator())
-                yield return new object[] { t.t1Kind, t.t1Text, t.separatorKind, t.separatorText, t.t2Kind, t.t2Text };
+            foreach (var (t1Kind, t1Text, separatorKind, separatorText, t2Kind, t2Text) in GetTokenPairsWithSeparator())
+                yield return new object[] { t1Kind, t1Text, separatorKind, separatorText, t2Kind, t2Text };
         }
 
         private static IEnumerable<(SyntaxKind kind, string text)> GetTokens()
@@ -152,10 +169,14 @@ namespace EV2.Tests.CodeAnalysis.Syntax
             {
                 (SyntaxKind.NumberToken, "1"),
                 (SyntaxKind.NumberToken, "123"),
+                (SyntaxKind.NumberToken, "1.0"),
+                (SyntaxKind.NumberToken, "123.3"),
                 (SyntaxKind.IdentifierToken, "a"),
                 (SyntaxKind.IdentifierToken, "abc"),
                 (SyntaxKind.StringToken, "\"Test\""),
                 (SyntaxKind.StringToken, "\"Te\"\"st\""),
+                (SyntaxKind.CharToken, "\'T\'"),
+                (SyntaxKind.CharToken, "\'\'\'\'"),
             };
 
             return fixedTokens.Concat(dynamicTokens);
@@ -201,6 +222,9 @@ namespace EV2.Tests.CodeAnalysis.Syntax
                 return true;
 
             if (t1Kind == SyntaxKind.StringToken && t2Kind == SyntaxKind.StringToken)
+                return true;
+
+            if (t1Kind == SyntaxKind.CharToken && t2Kind == SyntaxKind.CharToken)
                 return true;
 
             if (t1Kind == SyntaxKind.BangToken && t2Kind == SyntaxKind.EqualsToken)

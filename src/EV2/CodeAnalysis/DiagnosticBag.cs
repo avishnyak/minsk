@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using EV2.CodeAnalysis.Symbols;
 using EV2.CodeAnalysis.Syntax;
 using EV2.CodeAnalysis.Text;
@@ -34,6 +35,12 @@ namespace EV2.CodeAnalysis
             _diagnostics.Add(diagnostic);
         }
 
+        internal void ReportDivideByZero(TextLocation location)
+        {
+            const string? message = "Division by zero.";
+            ReportError(location, message);
+        }
+
         public void ReportInvalidNumber(TextLocation location, string text, TypeSymbol type)
         {
             var message = $"The number {text} isn't valid {type}.";
@@ -43,6 +50,18 @@ namespace EV2.CodeAnalysis
         public void ReportBadCharacter(TextLocation location, char character)
         {
             var message = $"Bad character input: '{character}'.";
+            ReportError(location, message);
+        }
+
+        internal void ReportEmptyCharConst(TextLocation location)
+        {
+            const string? message = "Empty character constant.";
+            ReportError(location, message);
+        }
+
+        internal void ReportInvalidCharConst(TextLocation location)
+        {
+            const string? message = "Character constant must be a single character surrounded by single quotes.";
             ReportError(location, message);
         }
 
@@ -325,5 +344,6 @@ namespace EV2.CodeAnalysis
                     throw new Exception($"Unexpected syntax {node.Kind}");
             }
         }
+
     }
 }

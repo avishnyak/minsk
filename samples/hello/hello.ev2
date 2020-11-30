@@ -4,12 +4,43 @@ function main()
     print("Hello world!")
 
     print("Variable types")
+
+    // Bool type
+    var bool_type: bool = true
+
+    // String type
     var str_var: string = "Hello"
-    var int_type: int = 123
-    var bool_type: bool = false
+    var char_var: char = 'A'
+
+    // Signed ints
+    var int8_type: int8 = 8
+    var int16_type: int16 = 16
+    var int_type: int32 = 123
+    // Supports _ for numerical separators
+    var int64_type: int64 = -64_000_000
+
+    // Unsigned ints
+    var uint8_type: int8 = 8
+    var uint16_type: int16 = 16
+    var uint32_type: int32 = 123
+    var uint64_type: int64 = 64_000_000
+
+    // Floats
+    var float32_type: float32 = 8.0
+    var float64_type: float64 = -16.32
 
     print(str_var)
+    print(char_var)
+    print(int8_type)
+    print(int16_type)
     print(int_type)
+    print(int64_type)
+    print(uint8_type)
+    print(uint16_type)
+    print(uint32_type)
+    print(uint64_type)
+    print(float32_type)
+    print(float64_type)
     print(bool_type)
 
     print("Variables with implied types")
@@ -23,7 +54,7 @@ function main()
 
     print("Variables with implied defaults")
     var str_var3: string
-    var int_type3: int
+    var int_type3: int32
     var bool_type3: bool
 
     print(str_var3)
@@ -32,7 +63,7 @@ function main()
 
     print("Variables with explicit defaults")
     var str_var4: string = default
-    var int_type4: int = default
+    var int_type4: int32 = default
     var bool_type4: bool = default
 
     print(str_var4)

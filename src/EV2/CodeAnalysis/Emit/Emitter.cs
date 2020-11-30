@@ -31,7 +31,18 @@ namespace EV2.CodeAnalysis.Emit
         private readonly MethodReference _stringConcat4Reference;
         private readonly MethodReference _stringConcatArrayReference;
         private readonly MethodReference _convertToBooleanReference;
+        private readonly MethodReference _convertToInt8Reference;
+        private readonly MethodReference _convertToInt16Reference;
         private readonly MethodReference _convertToInt32Reference;
+        private readonly MethodReference _convertToInt64Reference;
+        private readonly MethodReference _convertToUInt8Reference;
+        private readonly MethodReference _convertToUInt16Reference;
+        private readonly MethodReference _convertToUInt32Reference;
+        private readonly MethodReference _convertToUInt64Reference;
+        private readonly MethodReference _convertToFloat32Reference;
+        private readonly MethodReference _convertToFloat64Reference;
+        private readonly MethodReference _convertToFloat128Reference;
+        private readonly MethodReference _convertToCharReference;
         private readonly MethodReference _convertToStringReference;
         private readonly MethodReference _debuggableAttributeCtorReference;
         private readonly TypeReference _randomReference;
@@ -70,7 +81,18 @@ namespace EV2.CodeAnalysis.Emit
             {
                 (TypeSymbol.Any, "System.Object"),
                 (TypeSymbol.Bool, "System.Boolean"),
-                (TypeSymbol.Int, "System.Int32"),
+                (TypeSymbol.Int8, "System.SByte"),
+                (TypeSymbol.Int16, "System.Int16"),
+                (TypeSymbol.Int32, "System.Int32"),
+                (TypeSymbol.Int64, "System.Int64"),
+                (TypeSymbol.UInt8, "System.Byte"),
+                (TypeSymbol.UInt16, "System.UInt16"),
+                (TypeSymbol.UInt32, "System.UInt32"),
+                (TypeSymbol.UInt64, "System.UInt64"),
+                (TypeSymbol.Float32, "System.Single"),
+                (TypeSymbol.Float64, "System.Double"),
+                (TypeSymbol.Decimal, "System.Decimal"),
+                (TypeSymbol.Char, "System.Char"),
                 (TypeSymbol.String, "System.String"),
                 (TypeSymbol.Void, "System.Void"),
             };
@@ -164,9 +186,24 @@ namespace EV2.CodeAnalysis.Emit
             _stringConcat3Reference = ResolveMethod("System.String", "Concat", new [] { "System.String", "System.String", "System.String" });
             _stringConcat4Reference = ResolveMethod("System.String", "Concat", new [] { "System.String", "System.String", "System.String", "System.String" });
             _stringConcatArrayReference = ResolveMethod("System.String", "Concat", new [] { "System.String[]" });
+
             _convertToBooleanReference = ResolveMethod("System.Convert", "ToBoolean", new [] { "System.Object" });
+            _convertToInt8Reference = ResolveMethod("System.Convert", "ToByte", new[] { "System.Object" });
+            _convertToInt16Reference = ResolveMethod("System.Convert", "ToInt16", new [] { "System.Object" });
             _convertToInt32Reference = ResolveMethod("System.Convert", "ToInt32", new [] { "System.Object" });
+            _convertToInt64Reference = ResolveMethod("System.Convert", "ToInt64", new [] { "System.Object" });
+            _convertToUInt8Reference = ResolveMethod("System.Convert", "ToSByte", new[] { "System.Object" });
+            _convertToUInt16Reference = ResolveMethod("System.Convert", "ToUInt16", new [] { "System.Object" });
+            _convertToUInt32Reference = ResolveMethod("System.Convert", "ToUInt32", new [] { "System.Object" });
+            _convertToUInt64Reference = ResolveMethod("System.Convert", "ToUInt64", new [] { "System.Object" });
+
+            _convertToFloat32Reference = ResolveMethod("System.Convert", "ToSingle", new [] { "System.Object" });
+            _convertToFloat64Reference = ResolveMethod("System.Convert", "ToDouble", new [] { "System.Object" });
+            _convertToFloat128Reference = ResolveMethod("System.Convert", "ToDecimal", new [] { "System.Object" });
+
+            _convertToCharReference = ResolveMethod("System.Convert", "ToChar", new [] { "System.Object" });
             _convertToStringReference = ResolveMethod("System.Convert", "ToString", new [] { "System.Object" });
+
             _randomReference = ResolveType(null, "System.Random");
             _randomCtorReference = ResolveMethod("System.Random", ".ctor", Array.Empty<string>());
             _randomNextReference = ResolveMethod("System.Random", "Next", new [] { "System.Int32" });
@@ -641,17 +678,86 @@ namespace EV2.CodeAnalysis.Emit
 
             if (node.Type == TypeSymbol.Bool)
             {
+                Debug.Assert(node.ConstantValue.Value != null);
+
                 var value = (bool)node.ConstantValue.Value;
                 var instruction = value ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
                 ilProcessor.Emit(instruction);
             }
-            else if (node.Type == TypeSymbol.Int)
+            else if (node.Type == TypeSymbol.Int8 || node.Type == TypeSymbol.Int16 || node.Type == TypeSymbol.Int32)
             {
-                var value = (int)node.ConstantValue.Value;
+                Debug.Assert(node.ConstantValue.Value != null);
+
+                var value = Convert.ToInt32(node.ConstantValue.Value);
+
+                if (value <= int.MaxValue)
+                {
+                    ilProcessor.Emit(OpCodes.Ldc_I4, value);
+                }
+                else
+                {
+                    ilProcessor.Emit(OpCodes.Ldc_I4_S, value);
+                }
+            }
+            else if (node.Type == TypeSymbol.UInt8 || node.Type == TypeSymbol.UInt16 || node.Type == TypeSymbol.UInt32)
+            {
+                Debug.Assert(node.ConstantValue.Value != null);
+
+                var value = (uint)node.ConstantValue.Value;
+
+                if (value <= int.MaxValue)
+                {
+                    ilProcessor.Emit(OpCodes.Ldc_I4, (int)value);
+                }
+                else
+                {
+                    ilProcessor.Emit(OpCodes.Ldc_I4_S, value);
+                }
+            }
+            else if (node.Type == TypeSymbol.Int64)
+            {
+                Debug.Assert(node.ConstantValue.Value != null);
+
+                var value = (long)node.ConstantValue.Value;
+                if (value <= int.MaxValue)
+                {
+                    ilProcessor.Emit(OpCodes.Ldc_I4, (int)value);
+                    ilProcessor.Emit(OpCodes.Conv_I8);
+                }
+                else
+                {
+                    ilProcessor.Emit(OpCodes.Ldc_I8, value);
+                }
+            }
+            else if (node.Type == TypeSymbol.Float32)
+            {
+                Debug.Assert(node.ConstantValue.Value != null);
+
+                var value = (float)node.ConstantValue.Value;
+                ilProcessor.Emit(OpCodes.Ldc_R4, value);
+            }
+            else if (node.Type == TypeSymbol.Float64)
+            {
+                Debug.Assert(node.ConstantValue.Value != null);
+
+                var value = (double)node.ConstantValue.Value;
+                ilProcessor.Emit(OpCodes.Ldc_R8, value);
+            }
+            else if (node.Type == TypeSymbol.Char)
+            {
+                Debug.Assert(node.ConstantValue.Value != null);
+
+                var value = Convert.ToInt32(node.ConstantValue.Value);
                 ilProcessor.Emit(OpCodes.Ldc_I4, value);
             }
+
+            // TODO: Handle decimal
+
             else if (node.Type == TypeSymbol.String)
             {
+                // TODO: Handle null strings
+                Debug.Assert(node.ConstantValue.Value != null);
+
                 var value = (string)node.ConstantValue.Value;
                 ilProcessor.Emit(OpCodes.Ldstr, value);
             }
@@ -1021,7 +1127,8 @@ namespace EV2.CodeAnalysis.Emit
         {
             EmitExpression(ilProcessor, node.Expression);
             var needsBoxing = node.Expression.Type == TypeSymbol.Bool ||
-                              node.Expression.Type == TypeSymbol.Int;
+                              node.Expression.Type.IsNumeric;
+
             if (needsBoxing)
                 ilProcessor.Emit(OpCodes.Box, _knownTypes[node.Expression.Type]);
 
@@ -1033,9 +1140,53 @@ namespace EV2.CodeAnalysis.Emit
             {
                 ilProcessor.Emit(OpCodes.Call, _convertToBooleanReference);
             }
-            else if (node.Type == TypeSymbol.Int)
+            else if (node.Type == TypeSymbol.Int8)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToInt8Reference);
+            }
+            else if (node.Type == TypeSymbol.Int16)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToInt16Reference);
+            }
+            else if (node.Type == TypeSymbol.Int32)
             {
                 ilProcessor.Emit(OpCodes.Call, _convertToInt32Reference);
+            }
+            else if (node.Type == TypeSymbol.Int64)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToInt64Reference);
+            }
+            else if (node.Type == TypeSymbol.UInt8)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToUInt8Reference);
+            }
+            else if (node.Type == TypeSymbol.UInt16)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToUInt16Reference);
+            }
+            else if (node.Type == TypeSymbol.UInt32)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToUInt32Reference);
+            }
+            else if (node.Type == TypeSymbol.UInt64)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToUInt64Reference);
+            }
+            else if (node.Type == TypeSymbol.Float32)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToFloat32Reference);
+            }
+            else if (node.Type == TypeSymbol.Float64)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToFloat64Reference);
+            }
+            else if (node.Type == TypeSymbol.Decimal)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToFloat128Reference);
+            }
+            else if (node.Type == TypeSymbol.Char)
+            {
+                ilProcessor.Emit(OpCodes.Call, _convertToCharReference);
             }
             else if (node.Type == TypeSymbol.String)
             {
