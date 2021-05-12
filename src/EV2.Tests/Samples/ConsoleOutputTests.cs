@@ -24,53 +24,66 @@ namespace EV2.Tests.Snippets
                 WindowStyle = ProcessWindowStyle.Hidden,
                 CreateNoWindow = true,
                 ErrorDialog = false,
-                WorkingDirectory = Path.Combine(Environment.CurrentDirectory, @"..\..\..\..\samples\", filenamePrefix),
+                WorkingDirectory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, @"..\..\..\..\samples\", filenamePrefix)),
                 Arguments = "run",
                 FileName = "dotnet"
             };
 
             var output = new StringBuilder();
-            using Process process = Process.Start(psi);
-            using ManualResetEvent mreOut = new ManualResetEvent(false), mreErr = new ManualResetEvent(false);
-
-            process.OutputDataReceived += (o, e) =>
+            Process? process = null;
+            try
             {
-                if (e.Data == null)
-                {
-                    mreOut.Set();
-                }
-                else
-                {
-                    output.Append(e.Data);
-                    output.Append(Environment.NewLine);
-                }
-            };
-            process.BeginOutputReadLine();
+                process = Process.Start(psi);
 
-            process.ErrorDataReceived += (o, e) =>
+                Assert.NotNull(process);
+                if (process == null)
+                    return;
+
+                using ManualResetEvent mreOut = new ManualResetEvent(false), mreErr = new ManualResetEvent(false);
+
+                process.OutputDataReceived += (o, e) =>
+                {
+                    if (e.Data == null)
+                    {
+                        mreOut.Set();
+                    }
+                    else
+                    {
+                        output.Append(e.Data);
+                        output.Append(Environment.NewLine);
+                    }
+                };
+                process.BeginOutputReadLine();
+
+                process.ErrorDataReceived += (o, e) =>
+                {
+                    if (e.Data == null)
+                    {
+                        mreErr.Set();
+                    }
+                    else
+                    {
+                        output.Append(e.Data);
+                        output.Append(Environment.NewLine);
+                    }
+                };
+                process.BeginErrorReadLine();
+
+                process.StandardInput.Close();
+                process.WaitForExit();
+
+                mreOut.WaitOne();
+                mreErr.WaitOne();
+
+                // Compare stdout to outputfile
+                var outputPath = Path.GetFullPath(Path.Combine(@"..\..\..\..\samples", filenamePrefix, filenamePrefix + ".out"));
+
+                Assert.Equal(await File.ReadAllTextAsync(outputPath), output.ToString());
+            }
+            finally
             {
-                if (e.Data == null)
-                {
-                    mreErr.Set();
-                }
-                else
-                {
-                    output.Append(e.Data);
-                    output.Append(Environment.NewLine);
-                }
-            };
-            process.BeginErrorReadLine();
-
-            process.StandardInput.Close();
-            process.WaitForExit();
-
-            mreOut.WaitOne();
-            mreErr.WaitOne();
-
-            // Compare stdout to outputfile
-            var outputPath = Path.GetFullPath(Path.Combine(@"..\..\..\..\samples", filenamePrefix, filenamePrefix + ".out"));
-
-            Assert.Equal(await File.ReadAllTextAsync(outputPath), output.ToString());
+                process?.Dispose();
+            }
         }
     }
 }

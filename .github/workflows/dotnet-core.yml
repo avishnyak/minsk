@@ -1,0 +1,27 @@
+name: .NET Core
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.x'
+    - name: Install dependencies
+      run: dotnet restore ./src/EV2lang.sln
+    - name: Build
+      run: dotnet build ./src/EV2lang.sln --configuration Release --no-restore
+    - name: Unit Test
+      run: dotnet test ./src/EV2lang.sln --filter FullyQualifiedName\!~ConsoleOutputTests --no-restore --verbosity normal
+
+      # TODO: Add Console tests
