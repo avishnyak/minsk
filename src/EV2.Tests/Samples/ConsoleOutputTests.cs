@@ -24,7 +24,7 @@ namespace EV2.Tests.Snippets
                 WindowStyle = ProcessWindowStyle.Hidden,
                 CreateNoWindow = true,
                 ErrorDialog = false,
-                WorkingDirectory = Path.Combine(Environment.CurrentDirectory, @"..\..\..\..\samples\", filenamePrefix),
+                WorkingDirectory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, @"..\..\..\..\samples\", filenamePrefix)),
                 Arguments = "run",
                 FileName = "dotnet"
             };
