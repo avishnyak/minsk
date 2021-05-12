@@ -21,5 +21,7 @@ jobs:
       run: dotnet restore ./src/EV2lang.sln
     - name: Build
       run: dotnet build ./src/EV2lang.sln --configuration Release --no-restore
-    - name: Test
-      run: dotnet test ./src/EV2lang.sln --no-restore --verbosity normal
+    - name: Unit Test
+      run: dotnet test ./src/EV2lang.sln --filter FullyQualifiedName\!~ConsoleOutputTests --no-restore --verbosity normal
+
+      # TODO: Add Console tests
